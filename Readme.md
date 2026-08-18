@@ -178,22 +178,28 @@ mkdir models\multilingual-e5-small
 Proje yapısı yaklaşık olarak şu şekilde olmalıdır:
 
 ```text
-huggingface-model-server/
+Files/
 │
-├── app/
 ├── rag/
-├── scripts/
-├── models/
 │   │
-│   ├── qwen/
-│   │
-│   └── multilingual-e5-small/
+│   ├── backups/
+│   ├── evaluation/
+│   ├── incident_detection/
+│   ├── log_agent/
+│   ├── qdrant/
+│   ├── scripts/
+│   ├── training/
+│   ├── training_management/
+│   ├── training_pipeline/
+│   ├── worker/
+│   ├── export_training_dataset.py
+│   └── migrate_telemetry_v2.py
 │
-├── requirements.txt
-├── .env
-├── Dockerfile
-└── README.md
-```
+├── tools/
+│   └── whichllm
+│
+├── .gitignore
+└── Readme.md
 
 ---
 
