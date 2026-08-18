@@ -8,6 +8,33 @@ Model ağırlıkları büyük olduğu için GitHub repository içerisinde bulunm
 Projeyi indirdikten sonra model dosyalarının ayrıca indirilmesi gerekir.
 
 ---
+## Proje Yapısı
+
+Projenin ana dizin yapısı aşağıdaki gibidir:
+
+```text
+Files/
+│
+├── rag/
+│   │
+│   ├── backups/
+│   ├── evaluation/
+│   ├── incident_detection/
+│   ├── log_agent/
+│   ├── qdrant/
+│   ├── scripts/
+│   ├── training/
+│   ├── training_management/
+│   ├── training_pipeline/
+│   ├── worker/
+│   ├── export_training_dataset.py
+│   └── migrate_telemetry_v2.py
+│
+├── tools/
+│   └── whichllm
+│
+├── .gitignore
+└── Readme.md
 
 # Gereksinimler
 
