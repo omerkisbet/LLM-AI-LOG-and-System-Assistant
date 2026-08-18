@@ -1,0 +1,1 @@
+{"schema":{"expiresAt":"datetime","entityType":"keyword","path":"keyword","level":"keyword","sourceType":"keyword","statusCode":"integer","category":"keyword","timestamp":"datetime","action":"keyword","requestId":"keyword","actor":"keyword","entityId":"keyword"}}

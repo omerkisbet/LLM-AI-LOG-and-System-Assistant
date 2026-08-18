@@ -1,0 +1,3609 @@
+from __future__ import annotations
+
+import hmac
+import json
+import os
+import re
+import time
+import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from threading import Lock
+from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastembed import SparseTextEmbedding, TextEmbedding
+from fastembed.common.model_description import ModelSource, PoolingType
+from llama_cpp import Llama
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from qdrant_client import QdrantClient, models
+from upstash_vector import Index
+
+from operational_tools import build_plan_filter, execute_operational_plan
+from query_planner import QueryPlan, RetrievalMode, plan_query
+from telemetry import TelemetryStore
+from training_pipeline.telemetry_v2 import TrainingTelemetryCapture
+from training_management import TrainingManagementService
+from incident_detection.models import IncidentStatus
+from incident_detection.store import IncidentStore
+
+
+PROJECT_DIR = Path.home() / "huggingface-model-server"
+RAG_DIR = PROJECT_DIR / "rag"
+
+load_dotenv(RAG_DIR / ".env")
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+
+    if not value:
+        raise RuntimeError(f"Zorunlu ortam değişkeni eksik: {name}")
+
+    return value
+
+
+QDRANT_URL = required_env("QDRANT_URL")
+QDRANT_API_KEY = required_env("QDRANT_API_KEY")
+DELL_LOG_AGENT_API_KEY = required_env("DELL_LOG_AGENT_API_KEY")
+
+COLLECTION_NAME = os.getenv(
+    "QDRANT_COLLECTION",
+    "iotlab_operational_logs",
+).strip()
+
+VECTOR_DB_PROVIDER = os.getenv(
+    "VECTOR_DB_PROVIDER",
+    "qdrant",
+).strip().lower()
+
+if VECTOR_DB_PROVIDER not in {"qdrant", "upstash"}:
+    raise RuntimeError(
+        "VECTOR_DB_PROVIDER yalnızca 'qdrant' veya 'upstash' olabilir."
+    )
+
+UPSTASH_VECTOR_REST_URL = os.getenv(
+    "UPSTASH_VECTOR_REST_URL",
+    "",
+).strip()
+UPSTASH_VECTOR_REST_TOKEN = os.getenv(
+    "UPSTASH_VECTOR_REST_TOKEN",
+    "",
+).strip()
+UPSTASH_VECTOR_NAMESPACE = os.getenv(
+    "UPSTASH_VECTOR_NAMESPACE",
+    "",
+).strip()
+UPSTASH_VECTOR_DIMENSION = int(
+    os.getenv("UPSTASH_VECTOR_DIMENSION", "384")
+)
+
+if VECTOR_DB_PROVIDER == "upstash":
+    missing_upstash = [
+        name
+        for name, value in {
+            "UPSTASH_VECTOR_REST_URL": UPSTASH_VECTOR_REST_URL,
+            "UPSTASH_VECTOR_REST_TOKEN": UPSTASH_VECTOR_REST_TOKEN,
+            "UPSTASH_VECTOR_NAMESPACE": UPSTASH_VECTOR_NAMESPACE,
+        }.items()
+        if not value
+    ]
+
+    if missing_upstash:
+        raise RuntimeError(
+            "Upstash provider için eksik ortam değişkenleri: "
+            + ", ".join(missing_upstash)
+        )
+
+EMBEDDING_MODEL = os.getenv(
+    "EMBEDDING_MODEL",
+    "intfloat/multilingual-e5-small",
+).strip()
+
+EMBEDDING_MODEL_PATH = os.getenv(
+    "EMBEDDING_MODEL_PATH",
+    "",
+).strip()
+
+QWEN_MODEL_PATH = os.getenv("QWEN_MODEL_PATH", "").strip()
+QWEN_REPO_ID = os.getenv(
+    "QWEN_REPO_ID",
+    "MaziyarPanahi/Qwen3-4B-Instruct-2507-GGUF",
+).strip()
+QWEN_FILENAME = os.getenv(
+    "QWEN_FILENAME",
+    "Qwen3-4B-Instruct-2507.Q4_K_M.gguf",
+).strip()
+
+QWEN_CONTEXT_SIZE = int(os.getenv("QWEN_CONTEXT_SIZE", "4096"))
+QWEN_GPU_LAYERS = int(os.getenv("QWEN_GPU_LAYERS", "24"))
+
+RESULT_LIMIT = max(
+    1,
+    min(int(os.getenv("LOG_AGENT_RESULT_LIMIT", "12")), 50),
+)
+UPSTASH_CANDIDATE_LIMIT = max(
+    RESULT_LIMIT,
+    min(
+        int(os.getenv("UPSTASH_CANDIDATE_LIMIT", "80")),
+        1000,
+    ),
+)
+
+MIN_SCORE = float(os.getenv("LOG_AGENT_MIN_SCORE", "0.25"))
+SPARSE_MODEL = os.getenv(
+    "SPARSE_MODEL",
+    "Qdrant/bm25",
+).strip()
+
+SPARSE_MODEL_PATH = required_env(
+    "SPARSE_MODEL_PATH"
+)
+
+SPARSE_LANGUAGE = os.getenv(
+    "SPARSE_LANGUAGE",
+    "turkish",
+).strip()
+
+HYBRID_PREFETCH_LIMIT = max(
+    RESULT_LIMIT,
+    min(
+        int(os.getenv("HYBRID_PREFETCH_LIMIT", "40")),
+        200,
+    ),
+)
+PROMPT_EVIDENCE_LIMIT = max(
+    1,
+    min(int(os.getenv("PROMPT_EVIDENCE_LIMIT", "6")), RESULT_LIMIT),
+)
+PROMPT_DESCRIPTION_LIMIT = max(
+    200,
+    min(int(os.getenv("PROMPT_DESCRIPTION_LIMIT", "600")), 1200),
+)
+VECTOR_SIZE = 384
+MODEL_NAME = "Qwen3-4B-Instruct-2507-Q4_K_M"
+LOG_AGENT_MAX_TOKENS = max(
+    128,
+    min(int(os.getenv("LOG_AGENT_MAX_TOKENS", "320")), 700),
+)
+EXACT_TIMESTAMP_TOLERANCE_MS = max(
+    100,
+    min(
+        int(os.getenv("EXACT_TIMESTAMP_TOLERANCE_MS", "1000")),
+        5000,
+    ),
+)
+EXACT_TIMESTAMP_CANDIDATE_LIMIT = max(
+    RESULT_LIMIT,
+    min(
+        int(os.getenv("EXACT_TIMESTAMP_CANDIDATE_LIMIT", "64")),
+        256,
+    ),
+)
+EXACT_TIMESTAMP_EVIDENCE_LIMIT = max(
+    1,
+    min(
+        int(os.getenv("EXACT_TIMESTAMP_EVIDENCE_LIMIT", "1")),
+        RESULT_LIMIT,
+    ),
+)
+EXACT_TIMESTAMP_MULTI_EVIDENCE_LIMIT = max(
+    EXACT_TIMESTAMP_EVIDENCE_LIMIT,
+    min(
+        int(
+            os.getenv(
+                "EXACT_TIMESTAMP_MULTI_EVIDENCE_LIMIT",
+                "2",
+            )
+        ),
+        RESULT_LIMIT,
+    ),
+)
+
+
+TELEMETRY_ENABLED = os.getenv(
+    "LOG_AGENT_TELEMETRY_ENABLED",
+    "true",
+).strip().casefold() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+TELEMETRY_DB = os.getenv(
+    "LOG_AGENT_TELEMETRY_DB",
+    str(RAG_DIR / "data" / "log_agent_telemetry.sqlite3"),
+).strip()
+
+TRAINING_CANDIDATES_DIR = (
+    RAG_DIR
+    / "evaluation"
+    / "training_candidates"
+)
+
+TRAINING_PROMPT_VERSION = os.getenv(
+    "TRAINING_PROMPT_VERSION",
+    "log-agent-grounded-v1.3.2",
+).strip()
+
+TRAINING_MANAGEMENT_OUTPUT_DIR = Path(
+    os.getenv(
+        "TRAINING_MANAGEMENT_OUTPUT_DIR",
+        str(RAG_DIR / "training" / "approved_exports"),
+    ).strip()
+).expanduser()
+
+INCIDENT_API_ENABLED = os.getenv(
+    "INCIDENT_API_ENABLED",
+    "true",
+).strip().casefold() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+INCIDENT_DB_PATH = os.getenv(
+    "INCIDENT_DB_PATH",
+    str(RAG_DIR / "data" / "incident_detection.sqlite3"),
+).strip()
+
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    message: str = Field(
+        validation_alias=AliasChoices(
+            "message",
+            "question",
+        ),
+        min_length=1,
+        max_length=1000,
+    )
+
+    actor: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "actor",
+            "username",
+        ),
+        max_length=120,
+    )
+
+    timezone: str = Field(
+        default="Europe/Istanbul",
+        validation_alias=AliasChoices(
+            "timezone",
+            "timeZone",
+        ),
+        max_length=80,
+    )
+
+    language: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "language",
+            "lang",
+        ),
+        max_length=10,
+    )
+
+    requestId: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "requestId",
+            "request_id",
+            "conversationId",
+        ),
+        max_length=160,
+    )
+
+class EvidenceResponse(BaseModel):
+    sourceType: str
+    recordId: str
+    pointId: str | None = None
+    timestamp: datetime
+    level: str | None = None
+    action: str | None = None
+    entityType: str | None = None
+    entityId: str | None = None
+    description: str
+    requestId: str | None = None
+
+
+class ChatResponse(BaseModel):
+    queryId: str
+    answer: str
+    evidence: list[EvidenceResponse]
+    toolsUsed: list[str]
+    model: str
+    grounded: bool
+    generatedAt: datetime
+
+
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    queryId: str = Field(
+        validation_alias=AliasChoices(
+            "queryId",
+            "query_id",
+        ),
+        min_length=1,
+        max_length=100,
+    )
+
+    rating: str = Field(
+        min_length=2,
+        max_length=10,
+    )
+
+    reason: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
+    comment: str | None = Field(
+        default=None,
+        max_length=4000,
+    )
+
+    correctedAnswer: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "correctedAnswer",
+            "corrected_answer",
+        ),
+        max_length=20000,
+    )
+
+    actor: str | None = Field(
+        default=None,
+        max_length=200,
+    )
+
+    requestId: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "requestId",
+            "request_id",
+        ),
+        max_length=200,
+    )
+
+
+class FeedbackResponse(BaseModel):
+    status: str
+    feedbackId: str
+    queryId: str
+
+
+class TrainingReviewRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    actor: str = Field(min_length=1, max_length=200)
+    note: str | None = Field(default=None, max_length=4000)
+    correctedAnswer: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "correctedAnswer",
+            "corrected_answer",
+        ),
+        max_length=20000,
+    )
+
+
+class TrainingExportRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    actor: str = Field(min_length=1, max_length=200)
+    validationPercent: int = Field(
+        default=20,
+        validation_alias=AliasChoices(
+            "validationPercent",
+            "validation_percent",
+        ),
+        ge=5,
+        le=40,
+    )
+
+
+class IncidentActionRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    actor: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+    note: str | None = Field(
+        default=None,
+        max_length=4000,
+    )
+
+
+def register_embedding_model() -> None:
+    supported_models = TextEmbedding.list_supported_models()
+    names: set[str] = set()
+
+    for description in supported_models:
+        if isinstance(description, dict):
+            name = description.get("model")
+        else:
+            name = getattr(description, "model", None)
+
+        if name:
+            names.add(str(name))
+
+    if EMBEDDING_MODEL in names:
+        return
+
+    TextEmbedding.add_custom_model(
+        model=EMBEDDING_MODEL,
+        pooling=PoolingType.MEAN,
+        normalization=True,
+        sources=ModelSource(
+            hf="intfloat/multilingual-e5-small",
+        ),
+        dim=VECTOR_SIZE,
+        model_file="onnx/model.onnx",
+    )
+
+
+
+class RawQwenRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    message: str = Field(
+        min_length=1,
+        max_length=4000,
+    )
+
+    system_prompt: str = Field(
+        default="You are a helpful assistant.",
+        max_length=2000,
+    )
+
+    temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=2.0,
+    )
+
+    top_p: float = Field(
+        default=0.9,
+        gt=0.0,
+        le=1.0,
+    )
+
+    max_tokens: int = Field(
+        default=256,
+        ge=1,
+        le=1024,
+    )
+
+
+def load_qwen() -> Llama:
+    options = {
+        "n_ctx": QWEN_CONTEXT_SIZE,
+        "n_batch": 128,
+        "n_ubatch": 128,
+        "n_gpu_layers": QWEN_GPU_LAYERS,
+        "offload_kqv": False,
+        "flash_attn": True,
+        "use_mmap": True,
+        "verbose": False,
+    }
+
+    if QWEN_MODEL_PATH:
+        model_path = Path(QWEN_MODEL_PATH).expanduser()
+
+        if not model_path.exists():
+            raise FileNotFoundError(
+                f"Qwen modeli bulunamadı: {model_path}"
+            )
+
+        return Llama(
+            model_path=str(model_path),
+            **options,
+        )
+
+    return Llama.from_pretrained(
+        repo_id=QWEN_REPO_ID,
+        filename=QWEN_FILENAME,
+        **options,
+    )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Embedding modeli hazırlanıyor...")
+    register_embedding_model()
+
+    app.state.embedder = TextEmbedding(
+        model_name=EMBEDDING_MODEL,
+        threads=4,
+        specific_model_path=EMBEDDING_MODEL_PATH or None,
+        local_files_only=bool(EMBEDDING_MODEL_PATH),
+    )
+    app.state.sparse_embedder = SparseTextEmbedding(
+        model_name=SPARSE_MODEL,
+        language=SPARSE_LANGUAGE,
+        specific_model_path=SPARSE_MODEL_PATH,
+        local_files_only=True,
+    )
+
+    app.state.qdrant = QdrantClient(
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
+        timeout=60,
+    )
+
+    app.state.upstash = None
+
+    if VECTOR_DB_PROVIDER == "upstash":
+        app.state.upstash = Index(
+            url=UPSTASH_VECTOR_REST_URL,
+            token=UPSTASH_VECTOR_REST_TOKEN,
+        )
+
+        upstash_info = app.state.upstash.info()
+
+        if int(upstash_info.dimension) != UPSTASH_VECTOR_DIMENSION:
+            raise RuntimeError(
+                "Upstash dimension uyuşmazlığı: "
+                f"index={upstash_info.dimension}, "
+                f"ayar={UPSTASH_VECTOR_DIMENSION}"
+            )
+
+        print(
+            "Upstash Vector hazır:",
+            UPSTASH_VECTOR_NAMESPACE,
+            f"dimension={upstash_info.dimension}",
+        )
+
+    app.state.telemetry = None
+
+    if TELEMETRY_ENABLED:
+        try:
+            app.state.telemetry = TelemetryStore(
+                TELEMETRY_DB
+            )
+            print(
+                "Telemetry veritabanı hazır:",
+                TELEMETRY_DB,
+            )
+        except Exception as exc:
+            print(
+                "Telemetry başlatılamadı:",
+                type(exc).__name__,
+                str(exc),
+            )
+
+    app.state.training_capture = None
+
+    if TELEMETRY_ENABLED:
+        try:
+            app.state.training_capture = (
+                TrainingTelemetryCapture(
+                    TELEMETRY_DB
+                )
+            )
+            print(
+                "Training telemetry v2 hazır:",
+                TELEMETRY_DB,
+            )
+        except Exception as exc:
+            print(
+                "Training telemetry v2 başlatılamadı:",
+                type(exc).__name__,
+                str(exc),
+            )
+
+    app.state.training_management = None
+
+    if TELEMETRY_ENABLED:
+        try:
+            app.state.training_management = (
+                TrainingManagementService(
+                    TELEMETRY_DB,
+                    TRAINING_MANAGEMENT_OUTPUT_DIR,
+                )
+            )
+            print(
+                "Training management API hazır:",
+                TRAINING_MANAGEMENT_OUTPUT_DIR,
+            )
+        except Exception as exc:
+            print(
+                "Training management API başlatılamadı:",
+                type(exc).__name__,
+                str(exc),
+            )
+
+    app.state.incidents = None
+
+    if INCIDENT_API_ENABLED:
+        try:
+            app.state.incidents = IncidentStore(
+                INCIDENT_DB_PATH
+            )
+            print(
+                "Incident veritabanı hazır:",
+                INCIDENT_DB_PATH,
+            )
+        except Exception as exc:
+            print(
+                "Incident veritabanı başlatılamadı:",
+                type(exc).__name__,
+                str(exc),
+            )
+
+    print("Qwen modeli yükleniyor...")
+    app.state.llm = load_qwen()
+    app.state.llm_lock = Lock()
+
+    print("Dell log agent hazır.")
+    yield
+
+
+app = FastAPI(
+    title="IoT Lab Log RAG Agent",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+
+def verify_api_key(provided: str | None) -> None:
+    if not provided or not hmac.compare_digest(
+        provided,
+        DELL_LOG_AGENT_API_KEY,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid AI service API key.",
+        )
+
+
+
+@app.post("/api/qwen/chat")
+def raw_qwen_chat(
+    request: Request,
+    chat_request: RawQwenRequest,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+):
+    """Qdrant ve RAG kullanmadan doğrudan yerel Qwen modeliyle konuşur."""
+
+    from time import perf_counter
+
+    verify_api_key(api_key)
+
+    messages = []
+
+    system_prompt = chat_request.system_prompt.strip()
+
+    if system_prompt:
+        messages.append(
+            {
+                "role": "system",
+                "content": system_prompt,
+            }
+        )
+
+    messages.append(
+        {
+            "role": "user",
+            "content": chat_request.message.strip(),
+        }
+    )
+
+    started_at = perf_counter()
+
+    try:
+        with request.app.state.llm_lock:
+            completion = (
+                request.app.state.llm.create_chat_completion(
+                    messages=messages,
+                    temperature=chat_request.temperature,
+                    top_p=chat_request.top_p,
+                    max_tokens=chat_request.max_tokens,
+                )
+            )
+    except Exception as exc:
+        print(
+            "Ham Qwen cevabı üretilemedi:",
+            type(exc).__name__,
+            str(exc),
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Qwen response generation failed.",
+        ) from exc
+
+    latency_ms = round(
+        (perf_counter() - started_at) * 1000,
+        2,
+    )
+
+    choices = completion.get("choices") or []
+
+    if not choices:
+        raise HTTPException(
+            status_code=502,
+            detail="Qwen returned no choices.",
+        )
+
+    choice = choices[0]
+    message = choice.get("message") or {}
+    answer = (message.get("content") or "").strip()
+
+    if not answer:
+        raise HTTPException(
+            status_code=502,
+            detail="Qwen returned an empty response.",
+        )
+
+    usage = completion.get("usage") or {}
+
+    model_name = (
+        Path(QWEN_MODEL_PATH).name
+        if QWEN_MODEL_PATH
+        else QWEN_FILENAME
+    )
+
+    return {
+        "answer": answer,
+        "model": model_name,
+        "latency_ms": latency_ms,
+        "finish_reason": choice.get("finish_reason"),
+        "usage": {
+            "prompt_tokens": usage.get(
+                "prompt_tokens",
+                0,
+            ),
+            "completion_tokens": usage.get(
+                "completion_tokens",
+                0,
+            ),
+            "total_tokens": usage.get(
+                "total_tokens",
+                0,
+            ),
+        },
+        "retrieval_used": False,
+    }
+
+
+def normalize_question(question: str) -> str:
+    return " ".join(question.strip().split())
+
+
+ISO_TIMESTAMP_PATTERN = re.compile(
+    r"\b("
+    r"\d{4}-\d{2}-\d{2}"
+    r"T\d{2}:\d{2}:\d{2}"
+    r"(?:\.\d{1,6})?"
+    r"(?:Z|[+-]\d{2}:\d{2})"
+    r")\b",
+    re.IGNORECASE,
+)
+
+LEXICAL_STOPWORDS = {
+    "acaba",
+    "ama",
+    "ancak",
+    "bir",
+    "biri",
+    "bu",
+    "da",
+    "de",
+    "doğrudan",
+    "gibi",
+    "hata",
+    "hatası",
+    "hatasında",
+    "hangi",
+    "ile",
+    "ise",
+    "için",
+    "kaydı",
+    "kaydında",
+    "kök",
+    "mı",
+    "mi",
+    "mu",
+    "mü",
+    "neden",
+    "nedeni",
+    "nedir",
+    "ne",
+    "olarak",
+    "olmuş",
+    "olabilir",
+    "sorun",
+    "tarihindeki",
+    "ve",
+    "veya",
+    "zamanında",
+    "zamanındaki",
+    "the",
+    "this",
+    "what",
+    "why",
+    "error",
+    "log",
+}
+
+
+def extract_exact_timestamp(
+    question: str,
+) -> datetime | None:
+    match = ISO_TIMESTAMP_PATTERN.search(question)
+
+    if match is None:
+        return None
+
+    value = match.group(1)
+
+    try:
+        parsed = datetime.fromisoformat(
+            value.replace("Z", "+00:00")
+        )
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(timezone.utc)
+
+
+def build_exact_timestamp_filter(
+    exact_timestamp: datetime,
+) -> models.Filter:
+    tolerance = timedelta(
+        milliseconds=EXACT_TIMESTAMP_TOLERANCE_MS
+    )
+
+    return models.Filter(
+        must=[
+            models.FieldCondition(
+                key="timestamp",
+                range=models.DatetimeRange(
+                    gte=exact_timestamp - tolerance,
+                    lte=exact_timestamp + tolerance,
+                ),
+            )
+        ]
+    )
+
+
+def lexical_question_terms(
+    question: str,
+) -> set[str]:
+    without_timestamp = ISO_TIMESTAMP_PATTERN.sub(
+        " ",
+        question,
+    )
+
+    terms = {
+        token.casefold()
+        for token in re.findall(
+            r"[A-Za-zÇĞİÖŞÜçğıöşü0-9_.:/@-]+",
+            without_timestamp,
+        )
+        if len(token) >= 3
+    }
+
+    return {
+        term
+        for term in terms
+        if term not in LEXICAL_STOPWORDS
+    }
+
+
+def point_search_text(point: Any) -> str:
+    payload = dict(point.payload or {})
+
+    values = [
+        payload.get("content"),
+        payload.get("logger"),
+        payload.get("path"),
+        payload.get("category"),
+        payload.get("level"),
+        payload.get("source"),
+        payload.get("sourceType"),
+        payload.get("statusCode"),
+        payload.get("httpMethod"),
+        payload.get("action"),
+        payload.get("requestId"),
+        payload.get("documentId"),
+        payload.get("mongoId"),
+        point.id,
+    ]
+
+    return " ".join(
+        str(value)
+        for value in values
+        if value is not None
+    ).casefold()
+
+
+def exact_timestamp_point_score(
+    point: Any,
+    question: str,
+    exact_timestamp: datetime,
+) -> tuple[float, str]:
+    payload = dict(point.payload or {})
+    corpus = point_search_text(point)
+    terms = lexical_question_terms(question)
+
+    lexical_score = sum(
+        3.0
+        for term in terms
+        if term in corpus
+    )
+
+    high_value_patterns = (
+        r"/[A-Za-z0-9_./-]+",
+        r"\b[A-Za-z][A-Za-z0-9_$]*"
+        r"(?:Exception|Error|Manager|Handler|Impl)\b",
+        r"\b[1-5]\d{2}\b",
+        r"\btext/event-stream\b",
+        r"\bbroken pipe\b",
+        r"\brequest target\b",
+        r"\bswagger ui\b",
+        r"\bspringdoc\b",
+    )
+
+    for pattern in high_value_patterns:
+        for value in re.findall(
+            pattern,
+            question,
+            flags=re.IGNORECASE,
+        ):
+            if str(value).casefold() in corpus:
+                lexical_score += 10.0
+
+    timestamp_score = 0.0
+
+    try:
+        point_timestamp = parse_timestamp(
+            payload.get("timestamp")
+        ).astimezone(timezone.utc)
+        delta_seconds = abs(
+            (point_timestamp - exact_timestamp).total_seconds()
+        )
+        timestamp_score = max(
+            0.0,
+            20.0 - (delta_seconds * 10.0),
+        )
+    except Exception:
+        pass
+
+    return (
+        timestamp_score + lexical_score,
+        str(point.id),
+    )
+
+
+def rerank_exact_timestamp_points(
+    points: list[Any],
+    question: str,
+    exact_timestamp: datetime,
+) -> list[Any]:
+    return sorted(
+        points,
+        key=lambda point: exact_timestamp_point_score(
+            point,
+            question,
+            exact_timestamp,
+        ),
+        reverse=True,
+    )
+
+
+def exact_timestamp_evidence_limit(
+    question: str,
+) -> int:
+    """Choose the smallest evidence set explicitly requested by the user.
+
+    A precise timestamp normally describes one target log event. Multiple
+    evidence objects are returned only when the question clearly asks for
+    separate records, such as both audit and HTTP evidence.
+    """
+
+    lowered = question.casefold()
+
+    multi_record_patterns = (
+        r"\bhem\b.{0,80}\bhem\b",
+        r"\bboth\b.{0,80}\band\b",
+        r"\biki\s+(?:ayrı\s+)?(?:kayıt|log|kanıt)\b",
+        r"\b2\s+(?:ayrı\s+)?(?:kayıt|log|kanıt)\b",
+        r"\bbirden fazla\s+(?:kayıt|log|kanıt)\b",
+        r"\baudit\b.{0,80}\bhttp\b.{0,80}\bkanıt",
+        r"\bhttp\b.{0,80}\baudit\b.{0,80}\bkanıt",
+    )
+
+    if any(
+        re.search(pattern, lowered)
+        for pattern in multi_record_patterns
+    ):
+        return EXACT_TIMESTAMP_MULTI_EVIDENCE_LIMIT
+
+    return EXACT_TIMESTAMP_EVIDENCE_LIMIT
+
+
+def resolve_timezone(name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Europe/Istanbul")
+
+
+def resolve_time_range(
+    question: str,
+    timezone_name: str,
+) -> tuple[datetime | None, datetime | None]:
+    local_timezone = resolve_timezone(timezone_name)
+    now = datetime.now(local_timezone)
+    lowered = question.lower()
+
+    if "bugün" in lowered or "bugun" in lowered:
+        start = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        end = now
+        return start.astimezone(timezone.utc), end.astimezone(timezone.utc)
+
+    if "dün" in lowered or "dun" in lowered:
+        today_start = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        start = today_start - timedelta(days=1)
+        end = today_start - timedelta(microseconds=1)
+        return start.astimezone(timezone.utc), end.astimezone(timezone.utc)
+
+    hour_match = re.search(
+        r"son\s+(\d+)\s+saat",
+        lowered,
+    )
+
+    if hour_match:
+        hours = min(max(int(hour_match.group(1)), 1), 168)
+        start = now - timedelta(hours=hours)
+        return start.astimezone(timezone.utc), now.astimezone(timezone.utc)
+
+    day_match = re.search(
+        r"son\s+(\d+)\s+gün",
+        lowered,
+    )
+
+    if day_match:
+        days = min(max(int(day_match.group(1)), 1), 90)
+        start = now - timedelta(days=days)
+        return start.astimezone(timezone.utc), now.astimezone(timezone.utc)
+
+    return None, None
+
+
+def detect_filters(question: str) -> dict[str, str | None]:
+    lowered = question.lower()
+
+    source_type: str | None = None
+    action: str | None = None
+    level: str | None = None
+    entity_type: str | None = None
+
+    if any(
+        word in lowered
+        for word in ("silindi", "silinen", "silme", "sildi")
+    ):
+        source_type = "AUDIT_LOG"
+        action = "DELETE"
+
+    elif any(
+        word in lowered
+        for word in ("oluşturuldu", "oluşturulan", "eklendi", "eklenen")
+    ):
+        source_type = "AUDIT_LOG"
+        action = "CREATE"
+
+    elif any(
+        word in lowered
+        for word in ("güncellendi", "güncelleme", "değiştirildi")
+    ):
+        source_type = "AUDIT_LOG"
+        action = "UPDATE"
+
+    elif "başarısız giriş" in lowered:
+        source_type = "AUDIT_LOG"
+        action = "LOGIN_FAILURE"
+
+    elif "engellenen giriş" in lowered or "giriş engellendi" in lowered:
+        source_type = "AUDIT_LOG"
+        action = "LOGIN_BLOCKED"
+
+    elif "başarılı giriş" in lowered:
+        source_type = "AUDIT_LOG"
+        action = "LOGIN_SUCCESS"
+
+    elif "giriş" in lowered or "login" in lowered:
+        source_type = "AUDIT_LOG"
+
+    if any(
+        word in lowered
+        for word in ("hata", "error", "exception", "500")
+    ):
+        source_type = "RUNTIME_LOG"
+        level = "ERROR"
+
+    if source_type == "AUDIT_LOG":
+        entity_mapping = {
+            "haber": "NEWS",
+            "proje": "PROJECT",
+            "yayın": "PUBLICATION",
+            "yayin": "PUBLICATION",
+            "öğrenci": "STUDENT",
+            "ogrenci": "STUDENT",
+            "etkinlik": "ACTIVITY",
+            "mesaj": "CONTACT_MESSAGE",
+        }
+
+        for word, value in entity_mapping.items():
+            if word in lowered:
+                entity_type = value
+                break
+
+    return {
+        "sourceType": source_type,
+        "action": action,
+        "level": level,
+        "entityType": entity_type,
+    }
+
+
+def build_qdrant_filter(
+    detected: dict[str, str | None],
+    from_time: datetime | None,
+    to_time: datetime | None,
+) -> models.Filter | None:
+    conditions: list[models.Condition] = []
+
+    for field in (
+        "sourceType",
+        "action",
+        "level",
+        "entityType",
+    ):
+        value = detected.get(field)
+
+        if value:
+            conditions.append(
+                models.FieldCondition(
+                    key=field,
+                    match=models.MatchValue(value=value),
+                )
+            )
+
+    if from_time or to_time:
+        conditions.append(
+            models.FieldCondition(
+                key="timestamp",
+                range=models.DatetimeRange(
+                    gte=from_time,
+                    lte=to_time,
+                ),
+            )
+        )
+
+    if not conditions:
+        return None
+
+    return models.Filter(must=conditions)
+
+
+def parse_timestamp(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+
+    text = str(value).replace("Z", "+00:00")
+    return datetime.fromisoformat(text)
+
+
+def point_to_evidence(point: Any) -> EvidenceResponse:
+    payload = point.payload or {}
+
+    return EvidenceResponse(
+        sourceType=str(payload.get("sourceType", "UNKNOWN")),
+        recordId=str(
+            payload.get("mongoId")
+            or payload.get("documentId")
+            or point.id
+        ),
+        pointId=str(point.id),
+        timestamp=parse_timestamp(
+            payload.get("timestamp", datetime.now(timezone.utc))
+        ),
+        level=payload.get("level"),
+        action=payload.get("action"),
+        entityType=payload.get("entityType"),
+        entityId=payload.get("entityId"),
+        description=str(payload.get("content", ""))[:1500],
+        requestId=payload.get("requestId"),
+    )
+
+
+def upstash_result_to_evidence(result: Any) -> EvidenceResponse:
+    metadata = dict(result.metadata or {})
+
+    return EvidenceResponse(
+        sourceType=str(metadata.get("sourceType", "UNKNOWN")),
+        recordId=str(
+            metadata.get("mongoId")
+            or metadata.get("documentId")
+            or result.id
+        ),
+        pointId=str(result.id),
+        timestamp=parse_timestamp(
+            metadata.get("timestamp", datetime.now(timezone.utc))
+        ),
+        level=metadata.get("level"),
+        action=metadata.get("action"),
+        entityType=metadata.get("entityType"),
+        entityId=metadata.get("entityId"),
+        description=str(
+            result.data
+            or metadata.get("content")
+            or ""
+        )[:1500],
+        requestId=metadata.get("requestId"),
+    )
+
+
+def _upstash_literal(value: Any) -> str:
+    if isinstance(value, bool):
+        return "1" if value else "0"
+
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    return json.dumps(
+        str(value),
+        ensure_ascii=False,
+    )
+
+
+def build_upstash_filter(
+    query_filter: models.Filter | None,
+) -> str | None:
+    # Only equality conditions are sent to Upstash. Datetime ranges remain
+    # a local post-filter because snapshot timestamps are ISO strings.
+    if query_filter is None:
+        return None
+
+    expressions: list[str] = []
+
+    for condition in list(query_filter.must or []):
+        key = getattr(condition, "key", None)
+        match = getattr(condition, "match", None)
+
+        if not key or match is None:
+            continue
+
+        value = getattr(match, "value", None)
+
+        if value is None:
+            continue
+
+        expressions.append(
+            f"{key} = {_upstash_literal(value)}"
+        )
+
+    if not expressions:
+        return None
+
+    return " AND ".join(expressions)
+
+
+def _metadata_matches_condition(
+    metadata: dict[str, Any],
+    condition: Any,
+) -> bool:
+    key = getattr(condition, "key", None)
+
+    if not key:
+        return True
+
+    actual = metadata.get(key)
+    match = getattr(condition, "match", None)
+
+    if match is not None:
+        expected = getattr(match, "value", None)
+
+        if expected is not None and actual != expected:
+            return False
+
+    value_range = getattr(condition, "range", None)
+
+    if value_range is None:
+        return True
+
+    if actual is None:
+        return False
+
+    if key == "timestamp":
+        try:
+            actual_value: Any = parse_timestamp(actual)
+        except Exception:
+            return False
+    else:
+        actual_value = actual
+
+    for attribute, operator in (
+        ("gt", lambda left, right: left > right),
+        ("gte", lambda left, right: left >= right),
+        ("lt", lambda left, right: left < right),
+        ("lte", lambda left, right: left <= right),
+    ):
+        boundary = getattr(value_range, attribute, None)
+
+        if boundary is None:
+            continue
+
+        if key == "timestamp":
+            boundary = parse_timestamp(boundary)
+
+        try:
+            if not operator(actual_value, boundary):
+                return False
+        except TypeError:
+            return False
+
+    return True
+
+
+def metadata_matches_qdrant_filter(
+    metadata: dict[str, Any],
+    query_filter: models.Filter | None,
+) -> bool:
+    if query_filter is None:
+        return True
+
+    must_conditions = list(query_filter.must or [])
+
+    if not all(
+        _metadata_matches_condition(metadata, condition)
+        for condition in must_conditions
+    ):
+        return False
+
+    must_not_conditions = list(query_filter.must_not or [])
+
+    if any(
+        _metadata_matches_condition(metadata, condition)
+        for condition in must_not_conditions
+    ):
+        return False
+
+    should_conditions = list(query_filter.should or [])
+
+    if should_conditions and not any(
+        _metadata_matches_condition(metadata, condition)
+        for condition in should_conditions
+    ):
+        return False
+
+    return True
+
+
+def event_to_evidence(event: dict[str, Any]) -> EvidenceResponse:
+    event_point_id = event.get("pointId")
+
+    return EvidenceResponse(
+        sourceType=str(event.get("sourceType", "UNKNOWN")),
+        recordId=str(
+            event.get("mongoId")
+            or event.get("documentId")
+            or event_point_id
+            or event.get("entityId")
+            or "UNKNOWN"
+        ),
+        pointId=(
+            str(event_point_id)
+            if event_point_id is not None
+            else None
+        ),
+        timestamp=parse_timestamp(
+            event.get("timestamp", datetime.now(timezone.utc))
+        ),
+        level=event.get("level"),
+        action=event.get("action"),
+        entityType=event.get("entityType"),
+        entityId=event.get("entityId"),
+        description=str(
+            event.get("content")
+            or event.get("description")
+            or event.get("message")
+            or ""
+        )[:1500],
+        requestId=event.get("requestId"),
+    )
+
+
+def resolve_response_language(plan: QueryPlan) -> str:
+    return "en" if plan.detected_language == "en" else "tr"
+
+
+def compact_evidence_for_prompt(
+    evidence: list[EvidenceResponse],
+) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+
+    for item in evidence[:PROMPT_EVIDENCE_LIMIT]:
+        value = item.model_dump(
+            mode="json",
+            exclude_none=True,
+        )
+        value["description"] = str(
+            value.get("description") or ""
+        )[:PROMPT_DESCRIPTION_LIMIT]
+        payload.append(value)
+
+    return payload
+
+
+def compact_summary_for_prompt(
+    operational_summary: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if operational_summary is None:
+        return None
+
+    compact = dict(operational_summary)
+    compact.pop("latestEvents", None)
+    compact.pop("latestErrors", None)
+    compact.pop("latestWarnings", None)
+    return compact
+
+
+def evidence_text(evidence: EvidenceResponse) -> str:
+    values = (
+        evidence.description,
+        evidence.recordId,
+        evidence.pointId,
+        evidence.requestId,
+        evidence.entityId,
+        evidence.entityType,
+        evidence.action,
+        evidence.level,
+        evidence.sourceType,
+    )
+
+    return " ".join(
+        str(value)
+        for value in values
+        if value is not None
+    ).casefold()
+
+
+def missing_exact_terms(
+    plan: QueryPlan,
+    evidence: list[EvidenceResponse],
+) -> list[str]:
+    if not plan.exact_terms:
+        return []
+
+    corpus = " ".join(
+        evidence_text(item)
+        for item in evidence
+    )
+
+    return [
+        term
+        for term in plan.exact_terms
+        if term.casefold() not in corpus
+    ]
+
+
+def exact_term_not_found_answer(
+    missing_terms: list[str],
+    response_language: str,
+) -> str:
+    joined = ", ".join(missing_terms)
+
+    if response_language == "en":
+        return (
+            "No operational log directly matching the exact term(s) "
+            f"{joined} was found."
+        )
+
+    return (
+        "Kesin terimlerle doğrudan eşleşen bir operasyon logu "
+        f"bulunamadı: {joined}."
+    )
+
+
+def diagnostic_prompt_corpus(
+    chat_request: ChatRequest,
+    evidence: list[EvidenceResponse],
+) -> str:
+    values = [chat_request.message]
+
+    for item in evidence:
+        values.extend(
+            [
+                item.description,
+                item.level,
+                item.sourceType,
+                item.action,
+                item.entityType,
+                item.entityId,
+                item.requestId,
+            ]
+        )
+
+    return " ".join(
+        str(value)
+        for value in values
+        if value is not None
+    ).casefold()
+
+
+def diagnostic_prompt_profile(
+    chat_request: ChatRequest,
+    evidence: list[EvidenceResponse],
+) -> tuple[str, str, str]:
+    """Return (mode, category, bilingual guidance key).
+
+    The classifier is deliberately deterministic and narrow. It only selects
+    a compact prompt profile; it does not alter retrieval or evidence.
+    """
+
+    question = chat_request.message.casefold()
+    corpus = diagnostic_prompt_corpus(
+        chat_request,
+        evidence,
+    )
+
+    levels = {
+        str(item.level or "").upper()
+        for item in evidence
+    }
+
+    asks_normality = any(
+        term in question
+        for term in (
+            "hata mı",
+            "normal başlangıç",
+            "normal bilgi",
+            "is this an error",
+            "normal startup",
+            "normal information",
+        )
+    )
+
+    if (
+        asks_normality
+        and levels
+        and levels.isdisjoint({"ERROR", "WARN"})
+    ):
+        return "normal", "normal_event", "normal_event"
+
+    exact_permission_question = any(
+        term in question
+        for term in (
+            "hangi rol",
+            "hangi izin",
+            "eksik rol",
+            "eksik izin",
+            "kesin belirlenebilir mi",
+            "which role",
+            "which permission",
+            "missing role",
+            "missing permission",
+            "identified conclusively",
+            "conclusively from this log",
+        )
+    )
+
+    access_log_only_502 = (
+        "502" in corpus
+        and len(evidence) <= 2
+        and not any(
+            marker in corpus
+            for marker in (
+                "exception",
+                "connection refused",
+                "connect() failed",
+                "read timed out",
+                "timeout exception",
+                "broken pipe",
+            )
+        )
+    )
+
+    asks_exact_root_cause = any(
+        term in question
+        for term in (
+            "kesin kök neden",
+            "tek erişim kaydından",
+            "exact root cause",
+            "single access record",
+            "determined from this single",
+        )
+    )
+
+    access_log_only_503 = (
+        "503" in corpus
+        and len(evidence) <= 2
+        and asks_exact_root_cause
+        and any(
+            marker in corpus
+            for marker in (
+                "nginx.access",
+                "access log",
+                "access entry",
+                "erişim kaydı",
+                "no upstream error detail",
+            )
+        )
+        and not any(
+            marker in corpus
+            for marker in (
+                "exception",
+                "connection refused",
+                "connect() failed",
+                "read timed out",
+                "timeout exception",
+                "maintenance mode enabled",
+                "capacity exhausted",
+                "health check failed",
+            )
+        )
+    )
+
+    if exact_permission_question:
+        return (
+            "uncertain",
+            "authorization_detail_unknown",
+            "authorization_detail_unknown",
+        )
+
+    if access_log_only_502:
+        return (
+            "uncertain",
+            "upstream_502_unknown",
+            "upstream_502_unknown",
+        )
+
+    if access_log_only_503:
+        return (
+            "uncertain",
+            "http_503_unknown",
+            "http_503_unknown",
+        )
+
+    # Response-stream diagnostics require conjunction-based checks.
+    # This prevents generic HTTP/JSON advice when the evidence already
+    # establishes a Broken pipe or an SSE converter mismatch.
+    if "broken pipe" in corpus:
+        return (
+            "established",
+            "broken_pipe_response_write",
+            "broken_pipe_response_write",
+        )
+
+    if (
+        "text/event-stream" in corpus
+        and any(
+            marker in corpus
+            for marker in (
+                "no converter",
+                "httpmessagenotwritableexception",
+                "linkedhashmap",
+            )
+        )
+    ):
+        return (
+            "established",
+            "sse_message_converter_mismatch",
+            "sse_message_converter_mismatch",
+        )
+
+    category_checks = (
+        (
+            "security_committed_response",
+            (
+                "response already committed",
+                "already committed",
+                "authorizationdeniedexception",
+            ),
+        ),
+        (
+            "missing_static_resource",
+            (
+                "noresourcefoundexception",
+                "no static resource",
+                "statik kaynak",
+                "/favicon.ico",
+                "/images/",
+            ),
+        ),
+        (
+            "mongodb_authentication",
+            (
+                "scram-sha-256",
+                "authentication failed",
+                "mongodb rejected",
+            ),
+        ),
+        (
+            "mongodb_query_timeout",
+            (
+                "mongoexecutiontimeoutexception",
+                "maxtimems",
+                "exceeded time limit",
+            ),
+        ),
+        (
+            "connection_pool_exhaustion",
+            (
+                "hikaripool",
+                "connection is not available",
+                "waiting=",
+            ),
+        ),
+        (
+            "docker_port_conflict",
+            (
+                "bind for 0.0.0.0:",
+                "address already in use",
+                "port is already allocated",
+            ),
+        ),
+        (
+            "filesystem_permission",
+            (
+                "accessdeniedexception",
+                "permission denied",
+                "/app/uploads",
+            ),
+        ),
+        (
+            "connection_refused",
+            (
+                "connection refused",
+                "connect() failed (111",
+            ),
+        ),
+        (
+            "disk_full",
+            (
+                "enospc",
+                "no space left on device",
+            ),
+        ),
+        (
+            "cpu_throttling",
+            (
+                "cpu throttling",
+                "throttled",
+                "cpu limit",
+            ),
+        ),
+        (
+            "expired_certificate",
+            (
+                "sslhandshakeexception",
+                "certificate expired",
+                "notafter:",
+            ),
+        ),
+        (
+            "connection_reset",
+            (
+                "connection reset by peer",
+                "connection reset",
+            ),
+        ),
+        (
+            "read_timeout",
+            (
+                "read timed out",
+                "read timeout",
+            ),
+        ),
+        (
+            "cors_rejection",
+            (
+                "cors",
+                "preflight",
+                "allowed origins",
+            ),
+        ),
+    )
+
+    for category, markers in category_checks:
+        if any(marker in corpus for marker in markers):
+            return "established", category, category
+
+    return "established", "generic", "generic"
+
+
+def diagnostic_guidance(
+    guidance_key: str,
+    response_language: str,
+) -> str:
+    guidance: dict[str, tuple[str, str]] = {
+        "normal_event": (
+            "State that this is a normal informational event, explain what it confirms, and say that no remediation is required.",
+            "Bunun normal bir bilgi olayı olduğunu belirt, neyi doğruladığını açıkla ve müdahale gerekmediğini söyle.",
+        ),
+        "authorization_detail_unknown": (
+            "State only that access was denied. Explicitly say the exact missing role or permission is not identifiable from this log. Give one next diagnostic step: inspect the authenticated principal, assigned roles, and the matching authorization rule. Do not prescribe a permanent permission change.",
+            "Yalnızca erişimin reddedildiğini belirt. Eksik rol veya iznin bu logdan kesin belirlenemediğini açıkça söyle. Tek sonraki teşhis adımı olarak kimliği doğrulanan kullanıcıyı, atanmış rolleri ve eşleşen yetkilendirme kuralını incelemeyi öner. Kalıcı yetki değişikliği önermeyi zorunlu kılma.",
+        ),
+        "upstream_502_unknown": (
+            "The 502 status is established, but the internal upstream/model-service cause is not. Correlate upstream or model-service logs by the same timestamp or request ID. Do not provide a permanent fix without that evidence.",
+            "502 durumu kesindir ancak upstream/model-servis iç kök nedeni bilinmemektedir. Aynı timestamp veya requestId ile upstream ya da model-servis loglarını ilişkilendir. Bu kanıt olmadan kalıcı çözüm üretme.",
+        ),
+        "http_503_unknown": (
+            "State that HTTP 503 Service Unavailable is observed, but the exact root cause cannot be determined from this single NGINX access record. Explicitly say it cannot distinguish among upstream failure, maintenance mode, capacity exhaustion, or health-check failure. Give only the next diagnostic step: correlate the same timestamp or request ID in the NGINX error log, upstream service logs, service status, and health checks. Do not include a permanent remediation.",
+            "HTTP 503 Service Unavailable görüldüğünü, ancak bu tek NGINX erişim kaydından kesin kök nedenin belirlenemeyeceğini belirt. Upstream arızası, bakım modu, kapasite tükenmesi veya health-check hatası arasında ayrım yapılamadığını açıkça söyle. Yalnızca sonraki teşhis adımını ver: aynı timestamp veya requestId ile NGINX error logunu, upstream servis loglarını, servis durumunu ve health-check sonuçlarını ilişkilendir. Kalıcı çözüm ekleme.",
+        ),
+        "security_committed_response": (
+            "Separate the primary AuthorizationDeniedException from the secondary already-committed-response failure. Check security exception handling, filter order, response commit timing, and exception translation.",
+            "Birincil AuthorizationDeniedException ile ikincil response already committed problemini ayır. Security exception handling, filter order, response commit zamanı ve exception translation akışını kontrol etmeyi öner.",
+        ),
+        "missing_static_resource": (
+            "Check that the exact requested file or path exists and that Spring static-resource mappings include it. Permanent remediation is to add the resource or correct the mapping/path.",
+            "İstenen tam dosya veya yolun varlığını ve Spring statik kaynak eşlemesinin bu yolu kapsadığını kontrol et. Kalıcı çözüm olarak kaynağı eklemeyi ya da mapping/yolu düzeltmeyi belirt.",
+        ),
+        "mongodb_authentication": (
+            "Verify username, password, authSource, authentication mechanism, and the effective MONGODB_URI against the MongoDB server configuration.",
+            "Kullanıcı adı, parola, authSource, authentication mechanism ve etkin MONGODB_URI değerini MongoDB sunucu yapılandırmasıyla karşılaştır.",
+        ),
+        "mongodb_query_timeout": (
+            "State that the query exceeded its time limit. Run explain/explain executionStats, verify an index for the actual filter, and review query shape and maxTimeMS. Treat a missing index as a hypothesis until explain confirms it.",
+            "Sorgunun zaman sınırını aştığını belirt. explain/explain executionStats çalıştırmayı, gerçek filtre için index kontrolünü, sorgu biçimini ve maxTimeMS değerini incelemeyi öner. Explain doğrulamadan index eksikliğini kesin neden ilan etme.",
+        ),
+        "connection_pool_exhaustion": (
+            "State that all Hikari connections were in use and the waiting request timed out. Explicitly say increasing the pool size alone is not sufficient. Required checks are Hikari pool metrics, slow-query analysis, long-held connections, and connection-leak detection. Adjust maximumPoolSize only after comparing database capacity and concurrency.",
+            "Tüm Hikari bağlantılarının kullanımda olduğunu ve bekleyen isteğin timeout olduğunu belirt. Yalnızca pool boyutunu artırmanın yeterli olmadığını açıkça söyle. Hikari pool metrikleri, yavaş sorgu analizi, uzun tutulan bağlantılar ve connection-leak tespiti kontrol edilmelidir. maximumPoolSize değerini yalnızca veritabanı kapasitesi ve eşzamanlılıkla karşılaştırdıktan sonra ayarla.",
+        ),
+        "docker_port_conflict": (
+            "Identify the owner of the exact port with ss or lsof, stop or reconfigure the conflicting process/container, then bind the container to a free port.",
+            "Tam portu kullanan süreci/container'ı ss veya lsof ile bul, çakışan süreci durdur ya da yeniden yapılandır ve container'ı boş bir porta bağla.",
+        ),
+        "filesystem_permission": (
+            "Check the runtime UID/GID and mounted-volume ownership. Apply the smallest required chown/chmod change and ensure the persistent volume remains writable after restart.",
+            "Çalışan sürecin UID/GID değerini ve bağlı volume sahipliğini kontrol et. En dar gerekli chown/chmod değişikliğini uygula ve persistent volume'un yeniden başlatma sonrasında da yazılabilir kalmasını sağla.",
+        ),
+        "connection_refused": (
+            "Verify the exact upstream host and port with ss -lntp and a direct health request. Start the application if it is stopped, or correct the Nginx proxy_pass/upstream port if it is wrong.",
+            "Tam upstream host ve portu ss -lntp ve doğrudan health isteğiyle doğrula. Uygulama durmuşsa başlat; Nginx proxy_pass/upstream portu yanlışsa düzelt.",
+        ),
+        "disk_full": (
+            "First run df -h and df -i, identify the largest consumers, and free space safely. Use log rotation/retention or disk expansion as permanent prevention.",
+            "Önce df -h ve df -i çalıştır, en büyük disk tüketicilerini belirle ve güvenli temizlikle alan aç. Kalıcı önlem olarak log rotation/retention veya disk genişletme kullan.",
+        ),
+        "cpu_throttling": (
+            "Review the container CPU limit and resource requests, correlate throttling with latency, perform CPU profiling and a controlled load test, then optimize work or raise the limit only if capacity allows.",
+            "Container CPU limit ve resource requests değerlerini incele, throttling ile gecikmeyi ilişkilendir, CPU profiling ve kontrollü yük testi yap; ardından iş yükünü optimize et veya kapasite uygunsa limiti artır.",
+        ),
+        "expired_certificate": (
+            "Renew the expired certificate, install the full certificate chain, reload the affected service, and verify system time and the new NotAfter value.",
+            "Süresi dolan sertifikayı yenile, full chain'i yükle, ilgili servisi reload et ve sistem saati ile yeni NotAfter değerini doğrula.",
+        ),
+        "connection_reset": (
+            "State that the peer reset an established TCP connection. Correlate remote-service logs, proxy logs, service restarts, OOM events, and network-device resets to identify the trigger.",
+            "Karşı ucun kurulmuş TCP bağlantısını resetlediğini belirt. Tetikleyiciyi bulmak için karşı servis loglarını, proxy loglarını, servis restart olaylarını, OOM kayıtlarını ve ağ cihazı resetlerini ilişkilendir.",
+        ),
+        "read_timeout": (
+            "State explicitly that the TCP connection to the exact upstream endpoint was established, but the upstream response body did not complete within the 30000 ms (30-second) read timeout. Check upstream latency, model-service or upstream-service logs, backend processing duration, and the client/proxy/server read-timeout chain. Do not describe this as connection refused and do not suggest CORS unless CORS appears in evidence.",
+            "Tam upstream endpointine TCP bağlantısının kurulduğunu, ancak upstream yanıt gövdesinin 30000 ms (30 saniye) read timeout içinde tamamlanmadığını açıkça belirt. Upstream latency değerini, model-servis veya upstream-servis loglarını, backend işlem süresini ve client/proxy/server read-timeout zincirini kontrol et. Bunu connection refused olarak tanımlama ve kanıtta CORS yoksa CORS önerme.",
+        ),
+        "cors_rejection": (
+            "Add the exact trusted origin to an explicit allowlist with only required methods and headers. Avoid wildcard origins in production.",
+            "Tam güvenilir origin değerini yalnızca gerekli method ve header'larla açık allowlist'e ekle. Production ortamında wildcard origin kullanma.",
+        ),
+        "broken_pipe_response_write": (
+            "State that the server was writing the response through ServletOutputStream when the client or an intermediate proxy closed the connection before completion, producing Broken pipe. First check client disconnects, reverse-proxy timeout logs, response duration, and response payload size. Permanent remediation should focus on paginating or streaming large responses, aligning proxy/server timeouts, and handling client-abort exceptions without treating them as JSON-converter or HTTP-method failures. Do not recommend changing the HTTP method or generic JSON serialization unless evidence explicitly supports it.",
+            "Sunucu ServletOutputStream üzerinden yanıtı yazarken istemcinin veya ara proxy'nin bağlantıyı yanıt tamamlanmadan kapattığını ve bunun Broken pipe oluşturduğunu belirt. İlk olarak istemci bağlantı kesilmelerini, reverse proxy timeout loglarını, yanıt süresini ve yanıt boyutunu kontrol et. Kalıcı çözümü büyük yanıtları sayfalama veya stream etme, proxy/server timeout değerlerini uyumlu hâle getirme ve client-abort exception'larını uygun şekilde yönetme üzerine kur. Kanıt açıkça göstermiyorsa HTTP metodunu değiştirmeyi veya genel JSON serialization yapılandırmasını önermeme.",
+        ),
+        "sse_message_converter_mismatch": (
+            "State that the response content type had already been set to text/event-stream, while the global exception handler attempted to write a LinkedHashMap or JSON error body and no compatible message converter was available. First check whether the SSE response was already committed and where the exception occurred relative to stream startup. Permanent remediation is to handle failures before the stream starts or emit an SSE-compatible ServerSentEvent error and close the stream cleanly. Do not propose a generic JSON converter as the primary fix.",
+            "Yanıtın content type değerinin önceden text/event-stream olarak belirlendiğini, GlobalExceptionHandler'ın LinkedHashMap veya JSON hata gövdesi yazmaya çalıştığını ve uyumlu message converter bulunmadığını belirt. İlk olarak SSE yanıtının commit edilip edilmediğini ve exception'ın stream başlangıcına göre hangi aşamada oluştuğunu kontrol et. Kalıcı çözüm olarak hatayı stream başlamadan önce işle veya SSE uyumlu bir ServerSentEvent hata olayı gönderip stream'i güvenli biçimde kapat. Genel bir JSON converter eklemeyi birincil çözüm olarak önerme.",
+        ),
+        "generic": (
+            "Give one evidence-supported first check and one concise permanent remediation only when the cause is established.",
+            "Neden kanıtla belirliyse kanıta dayalı tek bir ilk kontrol ve kısa bir kalıcı çözüm ver.",
+        ),
+    }
+
+    english, turkish = guidance.get(
+        guidance_key,
+        guidance["generic"],
+    )
+
+    return english if response_language == "en" else turkish
+
+
+def compact_response_contract(
+    mode: str,
+    response_language: str,
+) -> str:
+    contracts: dict[str, tuple[str, str]] = {
+        "uncertain": (
+            "Use exactly four short lines titled: Observed event; Established facts; What cannot be determined; Next diagnostic step. Do not use headings such as Direct cause or Permanent remediation, and do not invent or prescribe a permanent fix.",
+            "Tam olarak dört kısa satır kullan: Gözlenen olay; Kesin bilinenler; Belirlenemeyenler; Sonraki teşhis adımı. Doğrudan neden veya Kalıcı çözüm başlığı kullanma; kalıcı çözüm uydurma veya dayatma.",
+        ),
+        "normal": (
+            "Use three short lines: Event type; Meaning; Action required. State clearly when no action is required.",
+            "Üç kısa satır kullan: Olay türü; Anlamı; Gereken işlem. Müdahale gerekmiyorsa bunu açıkça belirt.",
+        ),
+        "established": (
+            "Use four short lines: Error type; Direct cause; First safe check/action; Permanent remediation. Do not add a generic evidence-limit paragraph unless the question explicitly asks about uncertainty.",
+            "Dört kısa satır kullan: Hata türü; Doğrudan neden; İlk güvenli kontrol/müdahale; Kalıcı çözüm. Soru açıkça belirsizliği sormuyorsa genel bir kanıt sınırı paragrafı ekleme.",
+        ),
+    }
+
+    english, turkish = contracts[mode]
+    return english if response_language == "en" else turkish
+
+
+def diagnostic_generation_token_limit(
+    chat_request: ChatRequest,
+    plan: QueryPlan,
+) -> int:
+    if extract_exact_timestamp(chat_request.message) is not None:
+        return min(LOG_AGENT_MAX_TOKENS, 240)
+
+    if plan.retrieval_mode in {
+        RetrievalMode.AGGREGATE,
+        RetrievalMode.FILTERED_LIST,
+    }:
+        return LOG_AGENT_MAX_TOKENS
+
+    return min(LOG_AGENT_MAX_TOKENS, 260)
+
+
+def build_prompt(
+    chat_request: ChatRequest,
+    evidence: list[EvidenceResponse],
+    filtered_total: int | None,
+    response_language: str,
+    plan: QueryPlan,
+    operational_summary: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    evidence_payload = compact_evidence_for_prompt(evidence)
+    summary_payload = compact_summary_for_prompt(
+        operational_summary
+    )
+
+    total_text = (
+        str(filtered_total)
+        if filtered_total is not None
+        else "unknown"
+    )
+
+    mode, category, guidance_key = diagnostic_prompt_profile(
+        chat_request,
+        evidence,
+    )
+    contract = compact_response_contract(
+        mode,
+        response_language,
+    )
+    guidance = diagnostic_guidance(
+        guidance_key,
+        response_language,
+    )
+
+    if response_language == "en":
+        system_prompt = f"""
+You are an IoT Lab operational-log assistant.
+
+Rules:
+1. Answer entirely in English and use only the supplied summary and evidence.
+2. Never invent a cause, configuration value, endpoint, port, path, username, status code, or exception.
+3. Preserve technical identifiers exactly as written in evidence.
+4. Separate primary causes from secondary symptoms and do not combine unrelated events.
+5. If a requested detail is not established, state that explicitly and give only the next diagnostic step.
+6. Follow the response mode and incident-specific guidance below.
+7. Keep the answer within 115 words.
+8. End with the source types used.
+
+RESPONSE MODE: {mode}
+RESPONSE CONTRACT: {contract}
+INCIDENT CATEGORY: {category}
+INCIDENT GUIDANCE: {guidance}
+""".strip()
+
+        user_prompt = f"""
+QUESTION:
+{chat_request.message}
+
+TIME ZONE:
+{chat_request.timezone}
+
+QUERY PLAN:
+{json.dumps(plan.to_dict(), ensure_ascii=False)}
+
+TOTAL MATCHING RECORDS:
+{total_text}
+
+OPERATIONAL SUMMARY:
+{json.dumps(summary_payload, ensure_ascii=False)}
+
+EVIDENCE:
+{json.dumps(evidence_payload, ensure_ascii=False)}
+
+Answer only from these data.
+""".strip()
+    else:
+        system_prompt = f"""
+Sen IoT Lab operasyon loglarını analiz eden bir asistansın.
+
+Kurallar:
+1. Tamamen Türkçe cevap ver ve yalnızca verilen özet ile kanıtları kullan.
+2. Kanıtta olmayan neden, yapılandırma değeri, endpoint, port, dosya yolu, kullanıcı adı, durum kodu veya exception üretme.
+3. Teknik tanımlayıcıları kanıtta yazıldığı biçimde aynen koru.
+4. Birincil nedeni ikincil semptomdan ayır ve ilgisiz olayları birleştirme.
+5. Sorulan ayrıntı kanıtla belirlenmiyorsa bunu açıkça söyle ve yalnızca sonraki teşhis adımını ver.
+6. Aşağıdaki yanıt modu ve olaya özel rehbere uy.
+7. Yanıtı 105 kelime içinde tut.
+8. Sonunda kullanılan kaynak türlerini belirt.
+
+YANIT MODU: {mode}
+YANIT SÖZLEŞMESİ: {contract}
+OLAY KATEGORİSİ: {category}
+OLAYA ÖZEL REHBER: {guidance}
+""".strip()
+
+        user_prompt = f"""
+SORU:
+{chat_request.message}
+
+ZAMAN DİLİ:
+{chat_request.timezone}
+
+SORGU PLANI:
+{json.dumps(plan.to_dict(), ensure_ascii=False)}
+
+FİLTREYLE EŞLEŞEN TOPLAM KAYIT:
+{total_text}
+
+OPERASYON ÖZETİ:
+{json.dumps(summary_payload, ensure_ascii=False)}
+
+KANITLAR:
+{json.dumps(evidence_payload, ensure_ascii=False)}
+
+Yalnızca bu verilere göre cevap ver.
+""".strip()
+
+    return [
+        {
+            "role": "system",
+            "content": system_prompt,
+        },
+        {
+            "role": "user",
+            "content": user_prompt,
+        },
+    ]
+
+
+def fallback_answer(
+    evidence: list[EvidenceResponse],
+    filtered_total: int | None,
+    response_language: str,
+    operational_summary: dict[str, Any] | None = None,
+    plan: QueryPlan | None = None,
+) -> str:
+    if not evidence:
+        if response_language == "en":
+            return "No operational log matched the question."
+        return "Soruyla eşleşen bir operasyon logu bulunamadı."
+
+    total = (
+        filtered_total
+        if filtered_total is not None
+        else len(evidence)
+    )
+
+    source_types = sorted(
+        {item.sourceType for item in evidence}
+    )
+
+    if plan is not None and plan.exact_terms:
+        exact_text = ", ".join(plan.exact_terms)
+
+        if response_language == "en":
+            return (
+                f"Evidence directly matching {exact_text} was found in "
+                f"{len(evidence)} operational log records. "
+                f"Source types: {', '.join(source_types)}."
+            )
+
+        return (
+            f"{exact_text} ile doğrudan eşleşen kanıt "
+            f"{len(evidence)} operasyon logunda bulundu. "
+            f"Kaynak türleri: {', '.join(source_types)}."
+        )
+
+    if operational_summary is not None:
+        errors = int(
+            operational_summary.get("errorCount", 0)
+        )
+        warnings = int(
+            operational_summary.get("warningCount", 0)
+        )
+        created = int(
+            operational_summary.get("createdCount", 0)
+        )
+        updated = int(
+            operational_summary.get("updatedCount", 0)
+        )
+        deleted = int(
+            operational_summary.get("deletedCount", 0)
+        )
+
+        if response_language == "en":
+            return (
+                f"{total} operational events matched the requested period. "
+                f"Errors: {errors}; warnings: {warnings}; "
+                f"created: {created}; updated: {updated}; deleted: {deleted}. "
+                f"Source types: {', '.join(source_types)}."
+            )
+
+        return (
+            f"İstenen dönemle eşleşen {total} operasyon olayı bulundu. "
+            f"Hata: {errors}; uyarı: {warnings}; "
+            f"oluşturma: {created}; güncelleme: {updated}; silme: {deleted}. "
+            f"Kaynak türleri: {', '.join(source_types)}."
+        )
+
+    if response_language == "en":
+        return (
+            f"{total} records matched the filters. "
+            f"The {len(evidence)} most relevant records were reviewed. "
+            f"Source types: {', '.join(source_types)}."
+        )
+
+    return (
+        f"Filtrelerle eşleşen {total} kayıt bulundu. "
+        f"Rapor için en ilgili {len(evidence)} kayıt incelendi. "
+        f"Kaynak türleri: {', '.join(source_types)}."
+    )
+
+
+def telemetry_store_or_none(
+    request: Request,
+) -> TelemetryStore | None:
+    return getattr(
+        request.app.state,
+        "telemetry",
+        None,
+    )
+
+
+def require_telemetry_store(
+    request: Request,
+) -> TelemetryStore:
+    store = telemetry_store_or_none(request)
+
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Telemetry service is disabled or unavailable.",
+        )
+
+    return store
+
+
+def training_management_or_none(
+    request: Request,
+) -> TrainingManagementService | None:
+    return getattr(
+        request.app.state,
+        "training_management",
+        None,
+    )
+
+
+def require_training_management(
+    request: Request,
+) -> TrainingManagementService:
+    service = training_management_or_none(request)
+    if service is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Training management service is disabled "
+                "or unavailable."
+            ),
+        )
+    return service
+
+
+def incident_store_or_none(
+    request: Request,
+) -> IncidentStore | None:
+    return getattr(
+        request.app.state,
+        "incidents",
+        None,
+    )
+
+
+def require_incident_store(
+    request: Request,
+) -> IncidentStore:
+    store = incident_store_or_none(request)
+
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Incident service is disabled or unavailable.",
+        )
+
+    return store
+
+
+def normalize_incident_status(
+    value: str | None,
+) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip().upper()
+
+    try:
+        return IncidentStatus(normalized).value
+    except ValueError as exc:
+        allowed = ", ".join(
+            status.value
+            for status in IncidentStatus
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid incident status. Allowed: {allowed}",
+        ) from exc
+
+
+def training_capture_or_none(
+    request: Request,
+) -> TrainingTelemetryCapture | None:
+    return getattr(
+        request.app.state,
+        "training_capture",
+        None,
+    )
+
+
+def enum_value(value: Any) -> Any:
+    return getattr(value, "value", value)
+
+
+def query_plan_snapshot(
+    plan: QueryPlan | None,
+) -> dict[str, Any] | None:
+    if plan is None:
+        return None
+
+    fields = (
+        "detected_language",
+        "intent",
+        "retrieval_mode",
+        "time_scope",
+        "from_time_utc",
+        "to_time_utc",
+        "keywords",
+        "exact_terms",
+        "source_types",
+        "levels",
+        "actions",
+        "entity_types",
+        "limit",
+    )
+
+    snapshot: dict[str, Any] = {}
+
+    for field_name in fields:
+        if not hasattr(plan, field_name):
+            continue
+
+        value = getattr(plan, field_name)
+
+        if isinstance(value, datetime):
+            snapshot[field_name] = utc_text(value)
+        elif isinstance(value, (list, tuple, set)):
+            snapshot[field_name] = [
+                enum_value(item)
+                for item in value
+            ]
+        else:
+            snapshot[field_name] = enum_value(value)
+
+    return snapshot
+
+
+def utc_text(
+    value: datetime | None,
+) -> str | None:
+    if value is None:
+        return None
+
+    return (
+        value.astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def finalize_chat_response(
+    *,
+    request: Request,
+    chat_request: ChatRequest,
+    query_id: str,
+    question: str,
+    plan: QueryPlan | None,
+    response_language: str | None,
+    answer: str,
+    evidence: list[EvidenceResponse],
+    tools_used: list[str],
+    grounded: bool,
+    filtered_total: int | None,
+    started_at: float,
+    error_type: str | None = None,
+    error_message: str | None = None,
+) -> ChatResponse:
+    final_tools = list(dict.fromkeys(tools_used))
+    latency_ms = max(
+        int((time.perf_counter() - started_at) * 1000),
+        0,
+    )
+
+    store = telemetry_store_or_none(request)
+
+    if store is not None:
+        telemetry_tools = list(
+            dict.fromkeys(
+                [*final_tools, "sqlite_telemetry"]
+            )
+        )
+
+        try:
+            store.record_query(
+                query_id=query_id,
+                request_id=chat_request.requestId,
+                actor=chat_request.actor,
+                question=question,
+                requested_language=chat_request.language,
+                detected_language=(
+                    plan.detected_language
+                    if plan is not None
+                    else None
+                ),
+                response_language=response_language,
+                intent=(
+                    plan.intent.value
+                    if plan is not None
+                    else None
+                ),
+                retrieval_mode=(
+                    plan.retrieval_mode.value
+                    if plan is not None
+                    else None
+                ),
+                time_scope=(
+                    plan.time_scope.value
+                    if (
+                        plan is not None
+                        and plan.time_scope is not None
+                    )
+                    else None
+                ),
+                from_time_utc=(
+                    utc_text(plan.from_time_utc)
+                    if plan is not None
+                    else None
+                ),
+                to_time_utc=(
+                    utc_text(plan.to_time_utc)
+                    if plan is not None
+                    else None
+                ),
+                grounded=grounded,
+                evidence_count=len(evidence),
+                filtered_total=filtered_total,
+                tools_used=telemetry_tools,
+                latency_ms=latency_ms,
+                answer=answer,
+                error_type=error_type,
+                error_message=error_message,
+            )
+
+            capture = training_capture_or_none(request)
+
+            if capture is not None:
+                try:
+                    capture.record_context(
+                        query_id=query_id,
+                        evidence=[
+                            item.model_dump(mode="json")
+                            for item in evidence
+                        ],
+                        query_plan=query_plan_snapshot(plan),
+                        operational_summary={
+                            "grounded": grounded,
+                            "evidenceCount": len(evidence),
+                            "filteredTotal": filtered_total,
+                            "toolsUsed": telemetry_tools,
+                            "responseLanguage": response_language,
+                        },
+                        prompt_version=TRAINING_PROMPT_VERSION,
+                        model_name=MODEL_NAME,
+                    )
+                except Exception as capture_exc:
+                    print(
+                        "Training context kaydedilemedi:",
+                        type(capture_exc).__name__,
+                        str(capture_exc),
+                    )
+
+            final_tools = telemetry_tools
+        except Exception as exc:
+            print(
+                "Telemetry kaydı oluşturulamadı:",
+                type(exc).__name__,
+                str(exc),
+            )
+
+    return ChatResponse(
+        queryId=query_id,
+        answer=answer,
+        evidence=evidence,
+        toolsUsed=final_tools,
+        model=MODEL_NAME,
+        grounded=grounded,
+        generatedAt=datetime.now(timezone.utc),
+    )
+
+
+@app.get("/health")
+def health(request: Request) -> dict[str, Any]:
+    vector_store_health: dict[str, Any]
+
+    if VECTOR_DB_PROVIDER == "upstash":
+        try:
+            upstash_info = request.app.state.upstash.info()
+            namespace_info = (
+                upstash_info.namespaces.get(
+                    UPSTASH_VECTOR_NAMESPACE
+                )
+            )
+            points_count = int(
+                getattr(
+                    namespace_info,
+                    "vector_count",
+                    0,
+                )
+                or 0
+            )
+            vector_store_health = {
+                "status": "UP",
+                "provider": "upstash",
+                "namespace": UPSTASH_VECTOR_NAMESPACE,
+                "pointsCount": points_count,
+                "pendingPointsCount": int(
+                    getattr(
+                        namespace_info,
+                        "pending_vector_count",
+                        0,
+                    )
+                    or 0
+                ),
+                "dimension": int(upstash_info.dimension),
+                "similarity": str(
+                    upstash_info.similarity_function
+                ),
+                "retrievalMode": "dense",
+                "operationalFallback": "qdrant",
+            }
+        except Exception as exc:
+            points_count = 0
+            vector_store_health = {
+                "status": "DOWN",
+                "provider": "upstash",
+                "namespace": UPSTASH_VECTOR_NAMESPACE,
+                "error": type(exc).__name__,
+            }
+    else:
+        try:
+            collection = (
+                request.app.state.qdrant.get_collection(
+                    COLLECTION_NAME
+                )
+            )
+            points_count = int(collection.points_count or 0)
+            vector_store_health = {
+                "status": "UP",
+                "provider": "qdrant",
+                "collection": COLLECTION_NAME,
+                "pointsCount": points_count,
+                "retrievalMode": "dense+sparse+rrf",
+            }
+        except Exception as exc:
+            points_count = 0
+            vector_store_health = {
+                "status": "DOWN",
+                "provider": "qdrant",
+                "collection": COLLECTION_NAME,
+                "error": type(exc).__name__,
+            }
+
+    telemetry_health: dict[str, Any]
+    store = telemetry_store_or_none(request)
+
+    if not TELEMETRY_ENABLED:
+        telemetry_health = {
+            "status": "DISABLED",
+        }
+    elif store is None:
+        telemetry_health = {
+            "status": "DOWN",
+        }
+    else:
+        try:
+            telemetry_health = store.health()
+        except Exception as exc:
+            telemetry_health = {
+                "status": "DOWN",
+                "error": type(exc).__name__,
+            }
+
+    training_management_health: dict[str, Any]
+    training_management = training_management_or_none(request)
+
+    if not TELEMETRY_ENABLED:
+        training_management_health = {
+            "status": "DISABLED",
+        }
+    elif training_management is None:
+        training_management_health = {
+            "status": "DOWN",
+        }
+    else:
+        try:
+            training_management_health = (
+                training_management.health()
+            )
+        except Exception as exc:
+            training_management_health = {
+                "status": "DOWN",
+                "error": type(exc).__name__,
+            }
+
+    incident_health: dict[str, Any]
+    incident_store = incident_store_or_none(request)
+
+    if not INCIDENT_API_ENABLED:
+        incident_health = {
+            "status": "DISABLED",
+        }
+    elif incident_store is None:
+        incident_health = {
+            "status": "DOWN",
+        }
+    else:
+        try:
+            incident_health = incident_store.health()
+        except Exception as exc:
+            incident_health = {
+                "status": "DOWN",
+                "error": type(exc).__name__,
+            }
+
+    return {
+        "status": (
+            "UP"
+            if vector_store_health["status"] == "UP"
+            else "DEGRADED"
+        ),
+        "vectorDbProvider": VECTOR_DB_PROVIDER,
+        "collection": (
+            COLLECTION_NAME
+            if VECTOR_DB_PROVIDER == "qdrant"
+            else UPSTASH_VECTOR_NAMESPACE
+        ),
+        "pointsCount": points_count,
+        "vectorStore": vector_store_health,
+        "model": MODEL_NAME,
+        "telemetry": telemetry_health,
+        "trainingManagement": training_management_health,
+        "incidents": incident_health,
+    }
+
+
+@app.post(
+    "/api/log-agent/feedback",
+    response_model=FeedbackResponse,
+)
+def submit_feedback(
+    feedback_request: FeedbackRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> FeedbackResponse:
+    verify_api_key(api_key)
+    store = require_telemetry_store(request)
+
+    try:
+        feedback_id = store.record_feedback(
+            query_id=feedback_request.queryId,
+            rating=feedback_request.rating,
+            reason=feedback_request.reason,
+            comment=feedback_request.comment,
+            corrected_answer=(
+                feedback_request.correctedAnswer
+            ),
+            actor=feedback_request.actor,
+            request_id=feedback_request.requestId,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        print(
+            "Feedback kaydı oluşturulamadı:",
+            type(exc).__name__,
+            str(exc),
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Feedback could not be recorded.",
+        ) from exc
+
+    return FeedbackResponse(
+        status="RECORDED",
+        feedbackId=feedback_id,
+        queryId=feedback_request.queryId,
+    )
+
+
+@app.get("/api/log-agent/telemetry/recent")
+def recent_telemetry(
+    request: Request,
+    limit: int = 50,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    store = require_telemetry_store(request)
+
+    try:
+        items = store.recent_queries(limit=limit)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Telemetry queries could not be read.",
+        ) from exc
+
+    return {
+        "items": items,
+        "count": len(items),
+    }
+
+
+@app.get("/api/log-agent/telemetry/statistics")
+def telemetry_statistics(
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    store = require_telemetry_store(request)
+
+    try:
+        return store.feedback_statistics()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Telemetry statistics could not be calculated.",
+        ) from exc
+
+
+@app.post("/api/log-agent/telemetry/export")
+def export_training_candidates(
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    store = require_telemetry_store(request)
+
+    timestamp = datetime.now(
+        timezone.utc
+    ).strftime("%Y%m%dT%H%M%SZ")
+
+    output_path = (
+        TRAINING_CANDIDATES_DIR
+        / f"training_candidates_{timestamp}.jsonl"
+    )
+
+    try:
+        exported_count = (
+            store.export_training_candidates(
+                output_path
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Training candidates could not be exported.",
+        ) from exc
+
+    return {
+        "status": "EXPORTED",
+        "count": exported_count,
+        "path": str(output_path),
+    }
+
+
+@app.get("/api/log-agent/training/statistics")
+def training_statistics(
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    service = require_training_management(request)
+    try:
+        return service.statistics()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Training statistics could not be calculated.",
+        ) from exc
+
+
+@app.get("/api/log-agent/training/candidates")
+def list_training_candidates(
+    request: Request,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    search: str | None = None,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    service = require_training_management(request)
+    try:
+        return service.list_candidates(
+            status=status,
+            limit=limit,
+            offset=offset,
+            search=search,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Training candidates could not be read.",
+        ) from exc
+
+
+@app.get("/api/log-agent/training/candidates/{query_id}")
+def get_training_candidate(
+    query_id: str,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    service = require_training_management(request)
+    try:
+        return service.get_candidate(query_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Training candidate details could not be read.",
+        ) from exc
+
+
+def change_training_candidate_review(
+    *,
+    query_id: str,
+    review_request: TrainingReviewRequest,
+    request: Request,
+    status: str,
+) -> dict[str, Any]:
+    service = require_training_management(request)
+    try:
+        return service.review_candidate(
+            query_id=query_id,
+            status=status,
+            actor=review_request.actor,
+            note=review_request.note,
+            corrected_answer=review_request.correctedAnswer,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Training candidate review could not be saved.",
+        ) from exc
+
+
+@app.post("/api/log-agent/training/candidates/{query_id}/approve")
+def approve_training_candidate(
+    query_id: str,
+    review_request: TrainingReviewRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    return change_training_candidate_review(
+        query_id=query_id,
+        review_request=review_request,
+        request=request,
+        status="APPROVED",
+    )
+
+
+@app.post("/api/log-agent/training/candidates/{query_id}/reject")
+def reject_training_candidate(
+    query_id: str,
+    review_request: TrainingReviewRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    return change_training_candidate_review(
+        query_id=query_id,
+        review_request=review_request,
+        request=request,
+        status="REJECTED",
+    )
+
+
+@app.post("/api/log-agent/training/export")
+def export_approved_training_dataset(
+    export_request: TrainingExportRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    service = require_training_management(request)
+    try:
+        return service.export_approved(
+            actor=export_request.actor,
+            validation_percent=export_request.validationPercent,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Approved training dataset could not be exported.",
+        ) from exc
+
+
+@app.get("/api/log-agent/training/exports")
+def list_training_exports(
+    request: Request,
+    limit: int = 20,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    service = require_training_management(request)
+    try:
+        items = service.list_exports(limit=limit)
+        return {"items": items, "count": len(items)}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Training exports could not be read.",
+        ) from exc
+
+
+@app.get("/api/log-agent/incidents")
+def list_incidents(
+    request: Request,
+    status: str | None = None,
+    limit: int = 100,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    store = require_incident_store(request)
+    normalized_status = normalize_incident_status(status)
+
+    try:
+        items = store.list_incidents(
+            status=normalized_status,
+            limit=limit,
+        )
+        statistics = store.statistics()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Incidents could not be read.",
+        ) from exc
+
+    return {
+        "items": items,
+        "count": len(items),
+        "statistics": statistics,
+    }
+
+
+@app.get("/api/log-agent/incidents/{incident_id}")
+def get_incident(
+    incident_id: str,
+    request: Request,
+    eventLimit: int = 100,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    store = require_incident_store(request)
+
+    try:
+        return store.get_incident(
+            incident_id,
+            event_limit=eventLimit,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Incident details could not be read.",
+        ) from exc
+
+
+def change_incident_status(
+    *,
+    incident_id: str,
+    action_request: IncidentActionRequest,
+    request: Request,
+    status: IncidentStatus,
+) -> dict[str, Any]:
+    store = require_incident_store(request)
+
+    try:
+        store.update_status(
+            incident_id,
+            status=status,
+            actor=action_request.actor.strip(),
+            note=action_request.note,
+        )
+        return store.get_incident(incident_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Incident status could not be updated.",
+        ) from exc
+
+
+@app.post(
+    "/api/log-agent/incidents/{incident_id}/acknowledge"
+)
+def acknowledge_incident(
+    incident_id: str,
+    action_request: IncidentActionRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    return change_incident_status(
+        incident_id=incident_id,
+        action_request=action_request,
+        request=request,
+        status=IncidentStatus.ACKNOWLEDGED,
+    )
+
+
+@app.post(
+    "/api/log-agent/incidents/{incident_id}/resolve"
+)
+def resolve_incident(
+    incident_id: str,
+    action_request: IncidentActionRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    return change_incident_status(
+        incident_id=incident_id,
+        action_request=action_request,
+        request=request,
+        status=IncidentStatus.RESOLVED,
+    )
+
+
+@app.post(
+    "/api/log-agent/incidents/{incident_id}/ignore"
+)
+def ignore_incident(
+    incident_id: str,
+    action_request: IncidentActionRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> dict[str, Any]:
+    verify_api_key(api_key)
+    return change_incident_status(
+        incident_id=incident_id,
+        action_request=action_request,
+        request=request,
+        status=IncidentStatus.IGNORED,
+    )
+
+
+@app.post(
+    "/api/log-agent/chat",
+    response_model=ChatResponse,
+)
+def chat(
+    chat_request: ChatRequest,
+    request: Request,
+    api_key: Annotated[
+        str | None,
+        Header(alias="X-AI-Service-Key"),
+    ] = None,
+) -> ChatResponse:
+    verify_api_key(api_key)
+
+    started_at = time.perf_counter()
+    query_id = str(uuid.uuid4())
+    question = normalize_question(
+        chat_request.message
+    )
+
+    plan: QueryPlan | None = None
+    response_language: str | None = None
+    evidence: list[EvidenceResponse] = []
+    filtered_total: int | None = None
+    operational_summary: dict[str, Any] | None = None
+    tools_used: list[str] = []
+
+    try:
+        # Soru dili doğrudan soru metninden belirlenir.
+        # Arayüz Türkçe olsa bile İngilizce soru İngilizce yanıtlanır.
+        plan = plan_query(
+            question=question,
+            timezone_name=chat_request.timezone,
+            requested_language=chat_request.language,
+        )
+
+        response_language = resolve_response_language(
+            plan
+        )
+        query_filter = build_plan_filter(plan)
+        exact_timestamp = extract_exact_timestamp(
+            question
+        )
+
+        tools_used.append(
+            "bilingual_query_planner"
+        )
+
+        if exact_timestamp is not None:
+            exact_filter = build_exact_timestamp_filter(
+                exact_timestamp
+            )
+
+            exact_points, _ = (
+                request.app.state.qdrant.scroll(
+                    collection_name=COLLECTION_NAME,
+                    scroll_filter=exact_filter,
+                    limit=EXACT_TIMESTAMP_CANDIDATE_LIMIT,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            )
+
+            ranked_points = rerank_exact_timestamp_points(
+                points=list(exact_points),
+                question=question,
+                exact_timestamp=exact_timestamp,
+            )
+
+            evidence_limit = exact_timestamp_evidence_limit(
+                question
+            )
+
+            evidence = [
+                point_to_evidence(point)
+                for point in ranked_points[:evidence_limit]
+            ]
+            filtered_total = len(exact_points)
+
+            tools_used.extend(
+                [
+                    "qdrant_exact_timestamp_filter",
+                    "qdrant_exact_timestamp_scroll",
+                    "exact_timestamp_lexical_rerank",
+                    "exact_timestamp_evidence_pruning",
+                    (
+                        "exact_timestamp_multi_evidence"
+                        if evidence_limit > EXACT_TIMESTAMP_EVIDENCE_LIMIT
+                        else "exact_timestamp_single_evidence"
+                    ),
+                ]
+            )
+
+            if VECTOR_DB_PROVIDER == "upstash":
+                tools_used.append(
+                    "qdrant_exact_timestamp_fallback"
+                )
+
+        elif plan.retrieval_mode in {
+            RetrievalMode.AGGREGATE,
+            RetrievalMode.FILTERED_LIST,
+        }:
+            # İlk Upstash entegrasyonunda kesin aggregate/list işlemleri
+            # mevcut Qdrant operasyon katmanında tutulur. Semantik retrieval
+            # seçilen provider üzerinden çalışır.
+            operational_summary = execute_operational_plan(
+                client=request.app.state.qdrant,
+                collection_name=COLLECTION_NAME,
+                plan=plan,
+            )
+
+            filtered_total = int(
+                operational_summary.get(
+                    "totalEvents",
+                    0,
+                )
+            )
+
+            evidence = [
+                event_to_evidence(event)
+                for event in operational_summary.get(
+                    "latestEvents",
+                    [],
+                )
+            ]
+
+            tools_used.extend(
+                [
+                    "qdrant_payload_filter",
+                    "qdrant_scroll_retrieval",
+                    "deterministic_operational_summary",
+                ]
+            )
+
+            if VECTOR_DB_PROVIDER == "upstash":
+                tools_used.append(
+                    "qdrant_operational_fallback"
+                )
+        else:
+            dense_vector = next(
+                request.app.state.embedder.embed(
+                    [f"query: {question}"]
+                )
+            )
+
+            if VECTOR_DB_PROVIDER == "upstash":
+                upstash_filter = build_upstash_filter(
+                    query_filter
+                )
+
+                upstash_results = (
+                    request.app.state.upstash.query(
+                        vector=dense_vector.tolist(),
+                        top_k=UPSTASH_CANDIDATE_LIMIT,
+                        include_vectors=False,
+                        include_metadata=True,
+                        include_data=True,
+                        filter=upstash_filter,
+                        namespace=UPSTASH_VECTOR_NAMESPACE,
+                    )
+                )
+
+                locally_filtered_results = [
+                    result
+                    for result in upstash_results
+                    if metadata_matches_qdrant_filter(
+                        dict(result.metadata or {}),
+                        query_filter,
+                    )
+                ]
+
+                evidence = [
+                    upstash_result_to_evidence(result)
+                    for result in locally_filtered_results[
+                        :RESULT_LIMIT
+                    ]
+                ]
+
+                tools_used.extend(
+                    [
+                        "upstash_dense_retrieval",
+                        "upstash_namespace_query",
+                    ]
+                )
+
+                if upstash_filter:
+                    tools_used.append(
+                        "upstash_metadata_filter"
+                    )
+
+                if query_filter is not None:
+                    tools_used.append(
+                        "upstash_local_post_filter"
+                    )
+            else:
+                sparse_embedding = next(
+                    request.app.state.sparse_embedder.query_embed(
+                        question
+                    )
+                )
+
+                sparse_vector = models.SparseVector(
+                    indices=(
+                        sparse_embedding.indices.tolist()
+                    ),
+                    values=(
+                        sparse_embedding.values.tolist()
+                    ),
+                )
+
+                result = (
+                    request.app.state.qdrant.query_points(
+                        collection_name=COLLECTION_NAME,
+                        prefetch=[
+                            models.Prefetch(
+                                query=dense_vector.tolist(),
+                                using="dense",
+                                filter=query_filter,
+                                limit=HYBRID_PREFETCH_LIMIT,
+                            ),
+                            models.Prefetch(
+                                query=sparse_vector,
+                                using="sparse",
+                                filter=query_filter,
+                                limit=HYBRID_PREFETCH_LIMIT,
+                            ),
+                        ],
+                        query=models.FusionQuery(
+                            fusion=models.Fusion.RRF,
+                        ),
+                        limit=RESULT_LIMIT,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+                )
+
+                evidence = [
+                    point_to_evidence(point)
+                    for point in result.points
+                ]
+
+                # Payload-only count exact-term sorgularında yanıltıcıdır.
+                if (
+                    query_filter is not None
+                    and not plan.exact_terms
+                ):
+                    filtered_total = (
+                        request.app.state.qdrant.count(
+                            collection_name=COLLECTION_NAME,
+                            count_filter=query_filter,
+                            exact=True,
+                        ).count
+                    )
+
+                tools_used.extend(
+                    [
+                        "qdrant_dense_retrieval",
+                        "qdrant_sparse_bm25_retrieval",
+                        "qdrant_rrf_hybrid_fusion",
+                        "qdrant_payload_filter",
+                    ]
+                )
+
+        missing_terms = missing_exact_terms(
+            plan,
+            evidence,
+        )
+
+        if plan.exact_terms:
+            tools_used.append(
+                "exact_term_grounding_gate"
+            )
+
+        if missing_terms:
+            answer = exact_term_not_found_answer(
+                missing_terms=missing_terms,
+                response_language=response_language,
+            )
+
+            return finalize_chat_response(
+                request=request,
+                chat_request=chat_request,
+                query_id=query_id,
+                question=question,
+                plan=plan,
+                response_language=response_language,
+                answer=answer,
+                evidence=[],
+                tools_used=tools_used,
+                grounded=False,
+                filtered_total=filtered_total,
+                started_at=started_at,
+            )
+
+        if not evidence:
+            answer = fallback_answer(
+                evidence=[],
+                filtered_total=filtered_total,
+                response_language=response_language,
+                operational_summary=operational_summary,
+                plan=plan,
+            )
+
+            return finalize_chat_response(
+                request=request,
+                chat_request=chat_request,
+                query_id=query_id,
+                question=question,
+                plan=plan,
+                response_language=response_language,
+                answer=answer,
+                evidence=[],
+                tools_used=tools_used,
+                grounded=False,
+                filtered_total=filtered_total,
+                started_at=started_at,
+            )
+
+        messages = build_prompt(
+            chat_request=chat_request,
+            evidence=evidence,
+            filtered_total=filtered_total,
+            response_language=response_language,
+            plan=plan,
+            operational_summary=operational_summary,
+        )
+        generation_token_limit = (
+            diagnostic_generation_token_limit(
+                chat_request,
+                plan,
+            )
+        )
+        prompt_mode, prompt_category, _ = (
+            diagnostic_prompt_profile(
+                chat_request,
+                evidence,
+            )
+        )
+        tools_used.extend(
+            [
+                "adaptive_diagnostic_prompt",
+                f"adaptive_prompt_{prompt_mode}",
+                f"incident_guidance_{prompt_category}",
+                "adaptive_generation_token_limit",
+            ]
+        )
+
+        try:
+            with request.app.state.llm_lock:
+                completion = (
+                    request.app.state.llm.create_chat_completion(
+                        messages=messages,
+                        temperature=0.0,
+                        top_p=0.9,
+                        max_tokens=generation_token_limit,
+                    )
+                )
+
+            answer = (
+                completion["choices"][0]
+                ["message"]["content"]
+                or ""
+            ).strip()
+
+            if not answer:
+                answer = fallback_answer(
+                    evidence=evidence,
+                    filtered_total=filtered_total,
+                    response_language=response_language,
+                    operational_summary=operational_summary,
+                    plan=plan,
+                )
+                tools_used.append(
+                    "deterministic_fallback"
+                )
+            else:
+                tools_used.append(
+                    "qwen_report_generation"
+                )
+
+        except Exception as exc:
+            print(
+                "Qwen raporu üretilemedi:",
+                type(exc).__name__,
+                str(exc),
+            )
+
+            answer = fallback_answer(
+                evidence=evidence,
+                filtered_total=filtered_total,
+                response_language=response_language,
+                operational_summary=operational_summary,
+                plan=plan,
+            )
+
+            tools_used.append(
+                "deterministic_fallback"
+            )
+
+        return finalize_chat_response(
+            request=request,
+            chat_request=chat_request,
+            query_id=query_id,
+            question=question,
+            plan=plan,
+            response_language=response_language,
+            answer=answer,
+            evidence=evidence,
+            tools_used=tools_used,
+            grounded=True,
+            filtered_total=filtered_total,
+            started_at=started_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(
+            "Log agent isteği başarısız:",
+            type(exc).__name__,
+            str(exc),
+        )
+
+        error_language = (
+            response_language
+            or (
+                "en"
+                if (chat_request.language or "").casefold()
+                == "en"
+                else "tr"
+            )
+        )
+
+        error_answer = (
+            "The log assistant could not process the request."
+            if error_language == "en"
+            else "Log asistanı isteği işleyemedi."
+        )
+
+        # İşlenemeyen istek de telemetry kayıtlarına alınır.
+        finalize_chat_response(
+            request=request,
+            chat_request=chat_request,
+            query_id=query_id,
+            question=question,
+            plan=plan,
+            response_language=error_language,
+            answer=error_answer,
+            evidence=[],
+            tools_used=tools_used,
+            grounded=False,
+            filtered_total=filtered_total,
+            started_at=started_at,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": error_answer,
+                "queryId": query_id,
+            },
+        ) from exc

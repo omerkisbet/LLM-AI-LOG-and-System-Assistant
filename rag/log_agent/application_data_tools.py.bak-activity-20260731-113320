@@ -1,0 +1,1136 @@
+from __future__ import annotations
+
+import os
+import unicodedata
+from collections import Counter
+from dataclasses import dataclass
+from typing import Any
+
+import httpx
+
+
+BAHTIYAR_BASE_URL = os.getenv(
+    "BAHTIYAR_BASE_URL",
+    "",
+).strip().rstrip("/")
+
+DEFAULT_LIMIT = 20
+MAXIMUM_LIMIT = 100
+
+
+class ApplicationDataToolError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class ApplicationDataRequest:
+    entity: str
+    operation: str
+    language: str = "tr"
+    search_text: str | None = None
+    record_id: str | None = None
+    filters: dict[str, Any] | None = None
+    group_by: str | None = None
+    limit: int = DEFAULT_LIMIT
+
+
+class ApplicationDataClient:
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        timeout_seconds: float = 20.0,
+    ) -> None:
+        resolved_base_url = (
+            base_url
+            or BAHTIYAR_BASE_URL
+        ).strip().rstrip("/")
+
+        if not resolved_base_url:
+            raise ApplicationDataToolError(
+                "BAHTIYAR_BASE_URL yapılandırılmamış."
+            )
+
+        self.base_url = resolved_base_url
+        self.timeout = httpx.Timeout(
+            timeout_seconds,
+            connect=5.0,
+        )
+
+    def get(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        url = f"{self.base_url}{path}"
+
+        try:
+            with httpx.Client(
+                timeout=self.timeout,
+                follow_redirects=True,
+            ) as client:
+                response = client.get(
+                    url,
+                    params=params,
+                    headers={
+                        "Accept": "application/json",
+                    },
+                )
+        except httpx.HTTPError as exception:
+            raise ApplicationDataToolError(
+                "Bahtiyar uygulama verisi API'sine "
+                f"ulaşılamadı: {exception.__class__.__name__}"
+            ) from exception
+
+        if response.status_code == 404:
+            raise ApplicationDataToolError(
+                f"Backend endpoint bulunamadı: {path}"
+            )
+
+        if response.status_code < 200 \
+                or response.status_code >= 300:
+            raise ApplicationDataToolError(
+                "Backend uygulama verisi API'si "
+                f"HTTP {response.status_code} döndürdü."
+            )
+
+        try:
+            return response.json()
+        except ValueError as exception:
+            raise ApplicationDataToolError(
+                "Backend geçerli JSON döndürmedi."
+            ) from exception
+
+
+def normalize_text(value: Any) -> str:
+    if value is None:
+        return ""
+
+    text = str(value).strip().lower()
+
+    decomposed = unicodedata.normalize(
+        "NFKD",
+        text,
+    )
+
+    return "".join(
+        character
+        for character in decomposed
+        if not unicodedata.combining(character)
+    )
+
+
+def safe_limit(value: int | None) -> int:
+    if value is None:
+        return DEFAULT_LIMIT
+
+    return min(
+        max(int(value), 1),
+        MAXIMUM_LIMIT,
+    )
+
+
+def localized_value(
+    item: dict[str, Any],
+    language: str,
+    tr_field: str,
+    en_field: str,
+    legacy_field: str,
+) -> Any:
+    preferred = (
+        en_field
+        if language == "en"
+        else tr_field
+    )
+
+    secondary = (
+        tr_field
+        if language == "en"
+        else en_field
+    )
+
+    return (
+        item.get(preferred)
+        or item.get(secondary)
+        or item.get(legacy_field)
+    )
+
+
+def sanitize_student(
+    item: dict[str, Any],
+) -> dict[str, Any]:
+    first_name = str(
+        item.get("firstName") or ""
+    ).strip()
+
+    last_name = str(
+        item.get("lastName") or ""
+    ).strip()
+
+    full_name = " ".join(
+        value
+        for value in (
+            first_name,
+            last_name,
+        )
+        if value
+    )
+
+    return {
+        "id": item.get("id"),
+        "fullName": full_name,
+        "firstName": first_name or None,
+        "lastName": last_name or None,
+        "department": item.get("department"),
+        "currentTask": item.get("currentTask"),
+        "active": item.get("active"),
+        "memberType": (
+            item.get("memberType")
+            or "STUDENT"
+        ),
+        "academicTitle": item.get(
+            "academicTitle"
+        ),
+        "createdAt": item.get("createdAt"),
+        "updatedAt": item.get("updatedAt"),
+        "hasPhoto": bool(
+            item.get("photoPath")
+        ),
+    }
+
+
+def sanitize_project(
+    item: dict[str, Any],
+    language: str,
+) -> dict[str, Any]:
+    student_ids = list(
+        item.get("studentIds")
+        or []
+    )
+
+    return {
+        "id": item.get("id"),
+        "name": localized_value(
+            item,
+            language,
+            "nameTr",
+            "nameEn",
+            "name",
+        ),
+        "summary": localized_value(
+            item,
+            language,
+            "summaryTr",
+            "summaryEn",
+            "summary",
+        ),
+        "description": localized_value(
+            item,
+            language,
+            "descriptionTr",
+            "descriptionEn",
+            "description",
+        ),
+        "startDate": item.get("startDate"),
+        "endDate": item.get("endDate"),
+        "status": item.get("status"),
+        "technologies": list(
+            item.get("technologies")
+            or []
+        ),
+        "featured": item.get("featured"),
+        "contentStatus": item.get(
+            "contentStatus"
+        ),
+        "publishedAt": item.get(
+            "publishedAt"
+        ),
+        "contributorCount": len(student_ids),
+        "studentIds": student_ids,
+    }
+
+
+def sanitize_publication(
+    item: dict[str, Any],
+    language: str,
+) -> dict[str, Any]:
+    student_ids = list(
+        item.get("studentIds")
+        or []
+    )
+
+    return {
+        "id": item.get("id"),
+        "title": localized_value(
+            item,
+            language,
+            "titleTr",
+            "titleEn",
+            "title",
+        ),
+        "venue": localized_value(
+            item,
+            language,
+            "venueTr",
+            "venueEn",
+            "venue",
+        ),
+        "summary": localized_value(
+            item,
+            language,
+            "summaryTr",
+            "summaryEn",
+            "summary",
+        ),
+        "abstractText": localized_value(
+            item,
+            language,
+            "abstractTextTr",
+            "abstractTextEn",
+            "abstractText",
+        ),
+        "authors": list(
+            item.get("authors")
+            or []
+        ),
+        "publicationYear": item.get(
+            "publicationYear"
+        ),
+        "type": item.get("type"),
+        "doi": item.get("doi"),
+        "publicationUrl": item.get(
+            "publicationUrl"
+        ),
+        "featured": item.get("featured"),
+        "contentStatus": item.get(
+            "contentStatus"
+        ),
+        "publishedAt": item.get(
+            "publishedAt"
+        ),
+        "contributorCount": len(student_ids),
+        "studentIds": student_ids,
+    }
+
+
+def sanitize_news(
+    item: dict[str, Any],
+    language: str,
+) -> dict[str, Any]:
+    student_ids = list(
+        item.get("studentIds")
+        or []
+    )
+
+    return {
+        "id": item.get("id"),
+        "title": localized_value(
+            item,
+            language,
+            "titleTr",
+            "titleEn",
+            "title",
+        ),
+        "summary": localized_value(
+            item,
+            language,
+            "summaryTr",
+            "summaryEn",
+            "summary",
+        ),
+        "content": localized_value(
+            item,
+            language,
+            "contentTr",
+            "contentEn",
+            "content",
+        ),
+        "category": item.get("category"),
+        "publishedAt": item.get(
+            "publishedAt"
+        ),
+        "active": item.get("active"),
+        "featured": item.get("featured"),
+        "contentStatus": item.get(
+            "contentStatus"
+        ),
+        "relatedEntityId": item.get(
+            "relatedEntityId"
+        ),
+        "contributorCount": len(student_ids),
+        "studentIds": student_ids,
+    }
+
+
+def sanitize_activity(
+    item: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "id": item.get("id"),
+        "studentId": item.get("studentId"),
+        "title": item.get("title"),
+        "description": item.get(
+            "description"
+        ),
+        "activityDate": item.get(
+            "activityDate"
+        ),
+    }
+
+
+def contains_search_text(
+    item: dict[str, Any],
+    search_text: str,
+    fields: tuple[str, ...],
+) -> bool:
+    needle = normalize_text(search_text)
+
+    if not needle:
+        return True
+
+    haystack = " ".join(
+        str(item.get(field) or "")
+        for field in fields
+    )
+
+    return needle in normalize_text(haystack)
+
+
+def select_exact_student(
+    students: list[dict[str, Any]],
+    search_text: str,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    normalized_search = normalize_text(
+        search_text
+    )
+
+    exact_matches = [
+        student
+        for student in students
+        if normalize_text(
+            student.get("fullName")
+        ) == normalized_search
+    ]
+
+    if len(exact_matches) == 1:
+        return exact_matches[0], exact_matches
+
+    if not exact_matches \
+            and len(students) == 1:
+        return students[0], students
+
+    return None, exact_matches or students
+
+
+def fetch_students(
+    client: ApplicationDataClient,
+    search_text: str | None = None,
+) -> list[dict[str, Any]]:
+    if search_text:
+        raw = client.get(
+            "/api/students/search",
+            params={
+                "keyword": search_text,
+            },
+        )
+    else:
+        raw = client.get(
+            "/api/students"
+        )
+
+    return [
+        sanitize_student(item)
+        for item in (
+            raw
+            if isinstance(raw, list)
+            else []
+        )
+    ]
+
+
+def resolve_student(
+    client: ApplicationDataClient,
+    search_text: str,
+) -> dict[str, Any]:
+    students = fetch_students(
+        client,
+        search_text,
+    )
+
+    student, candidates = (
+        select_exact_student(
+            students,
+            search_text,
+        )
+    )
+
+    if student is not None:
+        return {
+            "resolved": True,
+            "student": student,
+            "candidates": [],
+        }
+
+    return {
+        "resolved": False,
+        "student": None,
+        "candidates": candidates,
+        "reason": (
+            "Öğrenci bulunamadı."
+            if not candidates
+            else "Birden fazla öğrenci eşleşti."
+        ),
+    }
+
+
+def student_profile(
+    client: ApplicationDataClient,
+    student_id: str,
+    language: str,
+) -> dict[str, Any]:
+    raw = client.get(
+        f"/api/students/{student_id}/profile"
+    )
+
+    student = sanitize_student(
+        raw.get("student") or {}
+    )
+
+    return {
+        "student": student,
+        "statistics": raw.get(
+            "statistics"
+        ) or {},
+        "projects": [
+            sanitize_project(
+                item,
+                language,
+            )
+            for item in (
+                raw.get("projects")
+                or []
+            )
+        ],
+        "publications": [
+            sanitize_publication(
+                item,
+                language,
+            )
+            for item in (
+                raw.get("publications")
+                or []
+            )
+        ],
+        "activities": [
+            sanitize_activity(item)
+            for item in (
+                raw.get("activities")
+                or []
+            )
+        ],
+        "news": [
+            sanitize_news(
+                item,
+                language,
+            )
+            for item in (
+                raw.get("news")
+                or []
+            )
+        ],
+        "studentPeriod": raw.get(
+            "studentPeriod"
+        ),
+        "academicianPeriod": raw.get(
+            "academicianPeriod"
+        ),
+    }
+
+
+def fetch_projects(
+    client: ApplicationDataClient,
+    filters: dict[str, Any],
+    language: str,
+    search_text: str | None,
+) -> list[dict[str, Any]]:
+    if filters.get("studentId"):
+        path = (
+            "/api/projects/student/"
+            f"{filters['studentId']}"
+        )
+    elif filters.get("status"):
+        path = (
+            "/api/projects/status/"
+            f"{filters['status']}"
+        )
+    elif filters.get("featured") is True:
+        path = "/api/projects/featured"
+    else:
+        path = "/api/projects"
+
+    raw = client.get(path)
+
+    projects = [
+        sanitize_project(
+            item,
+            language,
+        )
+        for item in (
+            raw
+            if isinstance(raw, list)
+            else []
+        )
+    ]
+
+    if search_text:
+        projects = [
+            item
+            for item in projects
+            if contains_search_text(
+                item,
+                search_text,
+                (
+                    "name",
+                    "summary",
+                    "description",
+                    "technologies",
+                ),
+            )
+        ]
+
+    return projects
+
+
+def fetch_publications(
+    client: ApplicationDataClient,
+    filters: dict[str, Any],
+    language: str,
+    search_text: str | None,
+) -> list[dict[str, Any]]:
+    if filters.get("studentId"):
+        path = (
+            "/api/publications/student/"
+            f"{filters['studentId']}"
+        )
+        params = None
+    elif filters.get("year") is not None:
+        path = (
+            "/api/publications/year/"
+            f"{int(filters['year'])}"
+        )
+        params = None
+    elif filters.get("type"):
+        path = (
+            "/api/publications/type/"
+            f"{filters['type']}"
+        )
+        params = None
+    elif filters.get("featured") is True:
+        path = "/api/publications/featured"
+        params = None
+    elif search_text:
+        path = "/api/publications/search"
+        params = {
+            "keyword": search_text,
+        }
+    else:
+        path = "/api/publications"
+        params = None
+
+    raw = client.get(
+        path,
+        params=params,
+    )
+
+    return [
+        sanitize_publication(
+            item,
+            language,
+        )
+        for item in (
+            raw
+            if isinstance(raw, list)
+            else []
+        )
+    ]
+
+
+def fetch_news(
+    client: ApplicationDataClient,
+    filters: dict[str, Any],
+    language: str,
+    search_text: str | None,
+) -> list[dict[str, Any]]:
+    if filters.get("category"):
+        path = (
+            "/api/news/category/"
+            f"{filters['category']}"
+        )
+        params = None
+    elif filters.get("featured") is True:
+        path = "/api/news/featured"
+        params = None
+    elif filters.get("active") is True:
+        path = "/api/news/active"
+        params = None
+    elif search_text:
+        path = "/api/news/search"
+        params = {
+            "keyword": search_text,
+        }
+    else:
+        path = "/api/news"
+        params = None
+
+    raw = client.get(
+        path,
+        params=params,
+    )
+
+    return [
+        sanitize_news(
+            item,
+            language,
+        )
+        for item in (
+            raw
+            if isinstance(raw, list)
+            else []
+        )
+    ]
+
+
+def fetch_activities(
+    client: ApplicationDataClient,
+) -> list[dict[str, Any]]:
+    """
+    Backend'de toplu GET /api/activities endpoint'i yoktur.
+
+    Etkinlikler mevcut read-only endpoint üzerinden,
+    her öğrenci için ayrı ayrı alınır:
+    GET /api/students/{studentId}/activities
+    """
+    students = fetch_students(client)
+
+    activities_by_id: dict[
+        str,
+        dict[str, Any],
+    ] = {}
+
+    activities_without_id: list[
+        dict[str, Any]
+    ] = []
+
+    for student in students:
+        student_id = str(
+            student.get("id")
+            or ""
+        ).strip()
+
+        if not student_id:
+            raise ApplicationDataToolError(
+                "Öğrenci cevabında id alanı eksik."
+            )
+
+        path = (
+            "/api/students/"
+            f"{student_id}"
+            "/activities"
+        )
+
+        raw = client.get(path)
+
+        if not isinstance(raw, list):
+            raise ApplicationDataToolError(
+                "Backend activity endpoint'i "
+                f"liste döndürmedi: {path}"
+            )
+
+        for item in raw:
+            if not isinstance(item, dict):
+                raise ApplicationDataToolError(
+                    "Backend activity listesinde "
+                    "nesne olmayan bir kayıt bulundu."
+                )
+
+            sanitized = sanitize_activity(
+                item
+            )
+
+            activity_id = str(
+                sanitized.get("id")
+                or ""
+            ).strip()
+
+            if activity_id:
+                activities_by_id[
+                    activity_id
+                ] = sanitized
+            else:
+                activities_without_id.append(
+                    sanitized
+                )
+
+    activities = [
+        *activities_by_id.values(),
+        *activities_without_id,
+    ]
+
+    activities.sort(
+        key=lambda item: str(
+            item.get("activityDate")
+            or ""
+        ),
+        reverse=True,
+    )
+
+    return activities
+
+def group_items(
+    entity: str,
+    items: list[dict[str, Any]],
+    group_by: str | None,
+) -> dict[str, int]:
+    normalized_group = normalize_text(
+        group_by
+    )
+
+    values: list[str] = []
+
+    if entity in {
+        "STUDENT",
+        "ACADEMICIAN",
+    }:
+        field = (
+            "department"
+            if normalized_group in {
+                "",
+                "department",
+                "bolum",
+            }
+            else "memberType"
+        )
+
+        values = [
+            str(item.get(field) or "UNKNOWN")
+            for item in items
+        ]
+
+    elif entity == "PROJECT":
+        if normalized_group in {
+            "technology",
+            "technologies",
+            "teknoloji",
+            "teknolojiler",
+        }:
+            for item in items:
+                values.extend(
+                    str(value)
+                    for value in (
+                        item.get("technologies")
+                        or []
+                    )
+                )
+        else:
+            values = [
+                str(
+                    item.get("status")
+                    or "UNKNOWN"
+                )
+                for item in items
+            ]
+
+    elif entity == "PUBLICATION":
+        field = (
+            "publicationYear"
+            if normalized_group in {
+                "year",
+                "yil",
+            }
+            else "type"
+        )
+
+        values = [
+            str(item.get(field) or "UNKNOWN")
+            for item in items
+        ]
+
+    elif entity == "NEWS":
+        field = (
+            "contentStatus"
+            if normalized_group in {
+                "status",
+                "contentstatus",
+            }
+            else "category"
+        )
+
+        values = [
+            str(item.get(field) or "UNKNOWN")
+            for item in items
+        ]
+
+    return dict(
+        Counter(values).most_common()
+    )
+
+
+def execute_application_data_request(
+    request: ApplicationDataRequest,
+    client: ApplicationDataClient | None = None,
+) -> dict[str, Any]:
+    data_client = (
+        client
+        or ApplicationDataClient()
+    )
+
+    entity = request.entity.strip().upper()
+    operation = request.operation.strip().upper()
+    language = (
+        "en"
+        if request.language == "en"
+        else "tr"
+    )
+    filters = dict(
+        request.filters
+        or {}
+    )
+    limit = safe_limit(request.limit)
+
+    if entity in {
+        "STUDENT",
+        "ACADEMICIAN",
+    }:
+        items = fetch_students(
+            data_client,
+            request.search_text
+            if operation == "SEARCH"
+            else None,
+        )
+
+        if entity == "ACADEMICIAN":
+            items = [
+                item
+                for item in items
+                if str(
+                    item.get("memberType")
+                    or ""
+                ).upper() == "ACADEMICIAN"
+            ]
+        else:
+            items = [
+                item
+                for item in items
+                if str(
+                    item.get("memberType")
+                    or "STUDENT"
+                ).upper() == "STUDENT"
+            ]
+
+        if "active" in filters:
+            expected_active = bool(
+                filters["active"]
+            )
+
+            items = [
+                item
+                for item in items
+                if item.get("active")
+                is expected_active
+            ]
+
+    elif entity == "PROJECT":
+        items = fetch_projects(
+            data_client,
+            filters,
+            language,
+            request.search_text,
+        )
+
+    elif entity == "PUBLICATION":
+        items = fetch_publications(
+            data_client,
+            filters,
+            language,
+            request.search_text,
+        )
+
+    elif entity == "NEWS":
+        items = fetch_news(
+            data_client,
+            filters,
+            language,
+            request.search_text,
+        )
+
+    elif entity == "ACTIVITY":
+        items = fetch_activities(
+            data_client,
+        )
+
+        if request.search_text:
+            items = [
+                item
+                for item in items
+                if contains_search_text(
+                    item,
+                    request.search_text,
+                    (
+                        "title",
+                        "description",
+                    ),
+                )
+            ]
+
+    elif entity == "STUDENT_PROFILE":
+        student_name = (
+            request.search_text
+            or filters.get("studentName")
+        )
+
+        if not student_name:
+            raise ApplicationDataToolError(
+                "STUDENT_PROFILE için öğrenci adı gerekli."
+            )
+
+        resolution = resolve_student(
+            data_client,
+            str(student_name),
+        )
+
+        if not resolution["resolved"]:
+            return {
+                "source": "SPRING_BOOT_APPLICATION_API",
+                "entity": entity,
+                "operation": operation,
+                "resolved": False,
+                "reason": resolution.get(
+                    "reason"
+                ),
+                "candidates": resolution.get(
+                    "candidates"
+                ),
+            }
+
+        student = resolution["student"]
+
+        profile = student_profile(
+            data_client,
+            str(student["id"]),
+            language,
+        )
+
+        return {
+            "source": "SPRING_BOOT_APPLICATION_API",
+            "entity": entity,
+            "operation": operation,
+            "resolved": True,
+            "profile": profile,
+        }
+
+    elif entity == "CONTACT_MESSAGE":
+        return {
+            "source": "SPRING_BOOT_APPLICATION_API",
+            "entity": entity,
+            "operation": operation,
+            "available": False,
+            "reason": (
+                "Contact message read endpoint has not "
+                "been verified in the current backend API."
+            ),
+        }
+
+    else:
+        raise ApplicationDataToolError(
+            f"Desteklenmeyen entity: {entity}"
+        )
+
+    total = len(items)
+
+    if operation == "COUNT":
+        return {
+            "source": "SPRING_BOOT_APPLICATION_API",
+            "entity": entity,
+            "operation": operation,
+            "count": total,
+            "filters": filters,
+        }
+
+    if operation in {
+        "GROUP",
+        "COMPARE",
+    }:
+        return {
+            "source": "SPRING_BOOT_APPLICATION_API",
+            "entity": entity,
+            "operation": operation,
+            "total": total,
+            "groupBy": request.group_by,
+            "groups": group_items(
+                entity,
+                items,
+                request.group_by,
+            ),
+        }
+
+    if operation == "GET":
+        if request.record_id:
+            matched = next(
+                (
+                    item
+                    for item in items
+                    if str(
+                        item.get("id")
+                    ) == request.record_id
+                ),
+                None,
+            )
+
+            return {
+                "source": "SPRING_BOOT_APPLICATION_API",
+                "entity": entity,
+                "operation": operation,
+                "found": matched is not None,
+                "item": matched,
+            }
+
+        if request.search_text:
+            matched = next(
+                (
+                    item
+                    for item in items
+                    if normalize_text(
+                        item.get("fullName")
+                        or item.get("name")
+                        or item.get("title")
+                    ) == normalize_text(
+                        request.search_text
+                    )
+                ),
+                None,
+            )
+
+            return {
+                "source": "SPRING_BOOT_APPLICATION_API",
+                "entity": entity,
+                "operation": operation,
+                "found": matched is not None,
+                "item": matched,
+                "candidates": (
+                    []
+                    if matched
+                    else items[:limit]
+                ),
+            }
+
+    return {
+        "source": "SPRING_BOOT_APPLICATION_API",
+        "entity": entity,
+        "operation": operation,
+        "total": total,
+        "returned": min(
+            total,
+            limit,
+        ),
+        "items": items[:limit],
+    }

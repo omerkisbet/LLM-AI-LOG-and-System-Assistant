@@ -1,0 +1,12 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.18.3
+    container_name: iotlab-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?QDRANT_API_KEY is required}
+      QDRANT__LOG_LEVEL: INFO
+    volumes:
+      - ./storage:/qdrant/storage

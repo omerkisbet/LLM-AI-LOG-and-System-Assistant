@@ -1,0 +1,26 @@
+{
+  "counts": {
+    "feedback": 16,
+    "legacyReviewQueue": 13,
+    "queries": 90,
+    "rawCandidates": 90,
+    "rejected": 74,
+    "sftTrain": 3,
+    "sftValidation": 0
+  },
+  "database": "/home/dell/huggingface-model-server/rag/data/log_agent_telemetry.sqlite3",
+  "generatedAtUtc": "2026-07-27T14:18:27.987718Z",
+  "policy": {
+    "downRequiresCorrectedAnswer": true,
+    "legacyRowsAreNotAutomaticallyTrained": true,
+    "redactionEnabled": true,
+    "trainingRequiresEvidenceSnapshot": true,
+    "trainingRequiresLatestFeedback": true,
+    "trainingRequiresQueryPlan": true,
+    "upUsesOriginalAnswer": true
+  },
+  "rejectionReasons": {
+    "LEGACY_WITHOUT_EVIDENCE": 13,
+    "NO_FEEDBACK": 74
+  }
+}

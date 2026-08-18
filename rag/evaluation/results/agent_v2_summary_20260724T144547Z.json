@@ -1,0 +1,48 @@
+{
+  "generatedAtUtc": "20260724T144547Z",
+  "agentUrl": "http://10.142.1.136:8000",
+  "collection": "iotlab_operational_logs_v2",
+  "totalCases": 18,
+  "passedCases": 14,
+  "failedCases": 4,
+  "passRate": 77.78,
+  "groundedResponses": 12,
+  "groundedRate": 66.67,
+  "averageLatencySeconds": 1.778,
+  "medianLatencySeconds": 0.049,
+  "maximumLatencySeconds": 19.149,
+  "equivalenceGroups": [
+    {
+      "group": "daily-summary-today",
+      "members": [
+        "daily-summary-tr",
+        "daily-summary-en"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "group": "daily-summary-yesterday",
+      "members": [
+        "yesterday-summary-tr",
+        "yesterday-summary-en"
+      ],
+      "passed": true,
+      "failures": []
+    },
+    {
+      "group": "error-count-two-hours",
+      "members": [
+        "error-count-tr",
+        "error-count-en"
+      ],
+      "passed": true,
+      "failures": []
+    }
+  ],
+  "resultFiles": {
+    "json": "results/agent_v2_results_20260724T144547Z.json",
+    "csv": "results/agent_v2_results_20260724T144547Z.csv",
+    "failures": "results/agent_v2_failures_20260724T144547Z.jsonl"
+  }
+}

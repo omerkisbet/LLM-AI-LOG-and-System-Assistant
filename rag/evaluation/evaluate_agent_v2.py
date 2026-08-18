@@ -1,0 +1,1075 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import os
+import re
+import statistics
+import sys
+import time
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import httpx
+from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+
+PROJECT_DIR = Path.home() / "huggingface-model-server"
+RAG_DIR = PROJECT_DIR / "rag"
+LOG_AGENT_DIR = RAG_DIR / "log_agent"
+
+sys.path.insert(0, str(LOG_AGENT_DIR))
+
+from operational_tools import execute_operational_plan
+from query_planner import plan_query
+
+
+load_dotenv(RAG_DIR / ".env")
+
+
+DEFAULT_AGENT_URL = "http://10.142.1.136:8000"
+DEFAULT_TIMEZONE = "Europe/Istanbul"
+
+TURKISH_WORDS = {
+    "ve",
+    "bir",
+    "bu",
+    "için",
+    "ile",
+    "olan",
+    "olarak",
+    "kayıt",
+    "kayıtlar",
+    "hata",
+    "hatalar",
+    "oluştu",
+    "bulundu",
+    "güncellendi",
+    "silindi",
+    "bugün",
+    "dün",
+    "toplam",
+    "sistemde",
+    "kaynak",
+}
+
+ENGLISH_WORDS = {
+    "the",
+    "and",
+    "a",
+    "an",
+    "for",
+    "with",
+    "was",
+    "were",
+    "is",
+    "are",
+    "record",
+    "records",
+    "error",
+    "errors",
+    "occurred",
+    "found",
+    "updated",
+    "deleted",
+    "today",
+    "yesterday",
+    "total",
+    "system",
+    "source",
+}
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+
+    if not value:
+        raise RuntimeError(
+            f"Zorunlu ortam değişkeni eksik: {name}"
+        )
+
+    return value
+
+
+def resolve_api_key() -> str:
+    environment_key = os.getenv(
+        "DELL_LOG_AGENT_API_KEY",
+        "",
+    ).strip()
+
+    if environment_key:
+        return environment_key
+
+    key_path = (
+        RAG_DIR
+        / "dell-agent-key.txt"
+    )
+
+    if not key_path.exists():
+        raise RuntimeError(
+            "Dell agent API anahtarı bulunamadı."
+        )
+
+    value = key_path.read_text(
+        encoding="utf-8"
+    ).strip()
+
+    if not value:
+        raise RuntimeError(
+            "Dell agent API anahtarı boş."
+        )
+
+    return value
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    cases: list[dict[str, Any]] = []
+
+    with path.open(
+        "r",
+        encoding="utf-8",
+    ) as file:
+        for line_number, line in enumerate(
+            file,
+            start=1,
+        ):
+            stripped = line.strip()
+
+            if not stripped:
+                continue
+
+            try:
+                value = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"JSONL satırı geçersiz: "
+                    f"{line_number}: {exc}"
+                ) from exc
+
+            cases.append(value)
+
+    if not cases:
+        raise RuntimeError(
+            "Evaluation veri seti boş."
+        )
+
+    return cases
+
+
+def normalize_text(value: Any) -> str:
+    return " ".join(
+        str(value or "").casefold().split()
+    )
+
+
+def detect_answer_language(
+    answer: str,
+) -> tuple[str, int, int]:
+    normalized = answer.casefold()
+
+    tokens = re.findall(
+        r"[a-zçğıöşü]+",
+        normalized,
+    )
+
+    turkish_score = sum(
+        1 for token in tokens
+        if token in TURKISH_WORDS
+    )
+
+    english_score = sum(
+        1 for token in tokens
+        if token in ENGLISH_WORDS
+    )
+
+    turkish_score += sum(
+        normalized.count(character)
+        for character in "çğıöşü"
+    )
+
+    if turkish_score >= english_score + 2:
+        return "tr", turkish_score, english_score
+
+    if english_score >= turkish_score + 2:
+        return "en", turkish_score, english_score
+
+    return "unknown", turkish_score, english_score
+
+
+def utc_text(value: Any) -> str | None:
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        return (
+            value.astimezone(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+
+    return str(value)
+
+
+def execute_local_plan(
+    qdrant: QdrantClient,
+    collection_name: str,
+    plan: Any,
+) -> dict[str, Any] | None:
+    if plan.retrieval_mode.value not in {
+        "AGGREGATE",
+        "FILTERED_LIST",
+    }:
+        return None
+
+    return execute_operational_plan(
+        client=qdrant,
+        collection_name=collection_name,
+        plan=plan,
+    )
+
+
+def check_case(
+    case: dict[str, Any],
+    response: dict[str, Any],
+    plan: Any,
+    latency_seconds: float,
+    local_summary: dict[str, Any] | None,
+    maximum_latency: float,
+) -> dict[str, Any]:
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    expected_intent = case.get(
+        "expectedIntent"
+    )
+
+    if (
+        expected_intent
+        and plan.intent.value != expected_intent
+    ):
+        failures.append(
+            "intent:"
+            f" beklenen={expected_intent},"
+            f" gelen={plan.intent.value}"
+        )
+
+    expected_mode = case.get(
+        "expectedMode"
+    )
+
+    if (
+        expected_mode
+        and plan.retrieval_mode.value
+        != expected_mode
+    ):
+        failures.append(
+            "retrievalMode:"
+            f" beklenen={expected_mode},"
+            f" gelen={plan.retrieval_mode.value}"
+        )
+
+    expected_language = case.get(
+        "expectedLanguage"
+    )
+
+    answer = str(
+        response.get("answer") or ""
+    ).strip()
+
+    (
+        detected_answer_language,
+        turkish_score,
+        english_score,
+    ) = detect_answer_language(answer)
+
+    if expected_language:
+        if detected_answer_language == "unknown":
+            warnings.append(
+                "Cevap dili kesin belirlenemedi."
+            )
+        elif (
+            detected_answer_language
+            != expected_language
+        ):
+            failures.append(
+                "answerLanguage:"
+                f" beklenen={expected_language},"
+                f" gelen={detected_answer_language}"
+            )
+
+    expected_grounded = case.get(
+        "expectedGrounded"
+    )
+
+    actual_grounded = bool(
+        response.get("grounded")
+    )
+
+    if (
+        expected_grounded is not None
+        and actual_grounded
+        != expected_grounded
+    ):
+        failures.append(
+            "grounded:"
+            f" beklenen={expected_grounded},"
+            f" gelen={actual_grounded}"
+        )
+
+    evidence = response.get("evidence") or []
+
+    minimum_evidence = int(
+        case.get("minEvidence", 0)
+    )
+
+    if len(evidence) < minimum_evidence:
+        failures.append(
+            "evidenceCount:"
+            f" minimum={minimum_evidence},"
+            f" gelen={len(evidence)}"
+        )
+
+    tools_used = [
+        str(tool)
+        for tool in (
+            response.get("toolsUsed")
+            or []
+        )
+    ]
+
+    missing_tools = [
+        expected_tool
+        for expected_tool in case.get(
+            "expectedTools",
+            [],
+        )
+        if expected_tool not in tools_used
+    ]
+
+    if missing_tools:
+        failures.append(
+            "missingTools: "
+            + ", ".join(missing_tools)
+        )
+
+    normalized_answer = normalize_text(
+        answer
+    )
+
+    missing_terms = [
+        term
+        for term in case.get(
+            "requiredTerms",
+            [],
+        )
+        if normalize_text(term)
+        not in normalized_answer
+    ]
+
+    if missing_terms:
+        failures.append(
+            "missingAnswerTerms: "
+            + ", ".join(missing_terms)
+        )
+
+    if not answer:
+        failures.append(
+            "Cevap metni boş."
+        )
+
+    latency_ok = (
+        latency_seconds
+        <= maximum_latency
+    )
+
+    if not latency_ok:
+        warnings.append(
+            f"Cevap süresi yüksek: "
+            f"{latency_seconds:.2f} saniye"
+        )
+
+    result = {
+        "id": case.get("id"),
+        "question": case.get("question"),
+        "requestLanguage": case.get(
+            "requestLanguage"
+        ),
+        "expectedLanguage": expected_language,
+        "detectedAnswerLanguage": (
+            detected_answer_language
+        ),
+        "languageScores": {
+            "tr": turkish_score,
+            "en": english_score,
+        },
+        "expectedIntent": expected_intent,
+        "actualIntent": plan.intent.value,
+        "expectedMode": expected_mode,
+        "actualMode": (
+            plan.retrieval_mode.value
+        ),
+        "timeScope": (
+            plan.time_scope.value
+            if plan.time_scope
+            else None
+        ),
+        "fromTimeUtc": utc_text(
+            plan.from_time_utc
+        ),
+        "toTimeUtc": utc_text(
+            plan.to_time_utc
+        ),
+        "expectedGrounded": (
+            expected_grounded
+        ),
+        "actualGrounded": actual_grounded,
+        "evidenceCount": len(evidence),
+        "toolsUsed": tools_used,
+        "latencySeconds": round(
+            latency_seconds,
+            3,
+        ),
+        "latencyOk": latency_ok,
+        "answer": answer,
+        "localOperationalSummary": (
+            local_summary
+        ),
+        "equivalenceGroup": case.get(
+            "equivalenceGroup"
+        ),
+        "failures": failures,
+        "warnings": warnings,
+        "passed": not failures,
+    }
+
+    return result
+
+
+def apply_equivalence_checks(
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    groups: dict[
+        str,
+        list[dict[str, Any]],
+    ] = defaultdict(list)
+
+    for result in results:
+        group_name = result.get(
+            "equivalenceGroup"
+        )
+
+        if group_name:
+            groups[str(group_name)].append(
+                result
+            )
+
+    group_results: list[dict[str, Any]] = []
+
+    comparison_fields = (
+        "totalEvents",
+        "runtimeLogCount",
+        "auditLogCount",
+        "errorCount",
+        "warningCount",
+        "createdCount",
+        "updatedCount",
+        "deletedCount",
+    )
+
+    for group_name, members in groups.items():
+        failures: list[str] = []
+
+        if len(members) < 2:
+            continue
+
+        first = members[0]
+
+        for member in members[1:]:
+            if (
+                member.get("fromTimeUtc")
+                != first.get("fromTimeUtc")
+            ):
+                failures.append(
+                    "fromTimeUtc uyuşmuyor."
+                )
+
+            if (
+                member.get("toTimeUtc")
+                != first.get("toTimeUtc")
+            ):
+                failures.append(
+                    "toTimeUtc uyuşmuyor."
+                )
+
+            first_summary = (
+                first.get(
+                    "localOperationalSummary"
+                )
+                or {}
+            )
+
+            member_summary = (
+                member.get(
+                    "localOperationalSummary"
+                )
+                or {}
+            )
+
+            for field in comparison_fields:
+                if (
+                    first_summary.get(field)
+                    != member_summary.get(field)
+                ):
+                    failures.append(
+                        f"{field} uyuşmuyor:"
+                        f" {first.get('id')}="
+                        f"{first_summary.get(field)},"
+                        f" {member.get('id')}="
+                        f"{member_summary.get(field)}"
+                    )
+
+        if failures:
+            for member in members:
+                member["failures"].extend(
+                    [
+                        "equivalenceGroup "
+                        f"{group_name}: {failure}"
+                        for failure in failures
+                    ]
+                )
+                member["passed"] = False
+
+        group_results.append(
+            {
+                "group": group_name,
+                "members": [
+                    member.get("id")
+                    for member in members
+                ],
+                "passed": not failures,
+                "failures": failures,
+            }
+        )
+
+    return group_results
+
+
+def write_csv(
+    path: Path,
+    results: list[dict[str, Any]],
+) -> None:
+    fields = (
+        "id",
+        "question",
+        "requestLanguage",
+        "expectedLanguage",
+        "detectedAnswerLanguage",
+        "expectedIntent",
+        "actualIntent",
+        "expectedMode",
+        "actualMode",
+        "timeScope",
+        "fromTimeUtc",
+        "toTimeUtc",
+        "expectedGrounded",
+        "actualGrounded",
+        "evidenceCount",
+        "latencySeconds",
+        "latencyOk",
+        "toolsUsed",
+        "passed",
+        "failures",
+        "warnings",
+        "answer",
+    )
+
+    with path.open(
+        "w",
+        encoding="utf-8-sig",
+        newline="",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fields,
+        )
+
+        writer.writeheader()
+
+        for result in results:
+            row = {
+                field: result.get(field)
+                for field in fields
+            }
+
+            row["toolsUsed"] = ";".join(
+                result.get("toolsUsed", [])
+            )
+
+            row["failures"] = " | ".join(
+                result.get("failures", [])
+            )
+
+            row["warnings"] = " | ".join(
+                result.get("warnings", [])
+            )
+
+            writer.writerow(row)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "IoT Lab log agent v2 evaluation"
+        )
+    )
+
+    parser.add_argument(
+        "--cases",
+        default="eval_cases_v2.jsonl",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        default="results",
+    )
+
+    parser.add_argument(
+        "--agent-url",
+        default=os.getenv(
+            "LOG_AGENT_URL",
+            DEFAULT_AGENT_URL,
+        ),
+    )
+
+    parser.add_argument(
+        "--max-latency",
+        type=float,
+        default=120.0,
+    )
+
+    args = parser.parse_args()
+
+    cases_path = Path(args.cases)
+    output_directory = Path(
+        args.output_dir
+    )
+
+    output_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    cases = read_jsonl(cases_path)
+
+    api_key = resolve_api_key()
+
+    qdrant = QdrantClient(
+        url=required_env("QDRANT_URL"),
+        api_key=required_env(
+            "QDRANT_API_KEY"
+        ),
+        timeout=120,
+    )
+
+    collection_name = os.getenv(
+        "QDRANT_COLLECTION",
+        "iotlab_operational_logs_v2",
+    ).strip()
+
+    results: list[dict[str, Any]] = []
+
+    # Bütün Türkçe/İngilizce eşdeğer sorgular aynı
+    # referans zamanından planlanır.
+    evaluation_now = datetime.now(timezone.utc)
+
+    headers = {
+        "X-AI-Service-Key": api_key,
+        "Content-Type": (
+            "application/json; charset=utf-8"
+        ),
+    }
+
+    timeout = httpx.Timeout(
+        connect=15,
+        read=180,
+        write=30,
+        pool=15,
+    )
+
+    with httpx.Client(
+        timeout=timeout,
+        headers=headers,
+    ) as client:
+        for index, case in enumerate(
+            cases,
+            start=1,
+        ):
+            case_id = str(
+                case.get("id")
+                or f"case-{index}"
+            )
+
+            question = str(
+                case.get("question")
+                or ""
+            ).strip()
+
+            request_language = str(
+                case.get(
+                    "requestLanguage",
+                    "tr",
+                )
+            )
+
+            timezone_name = str(
+                case.get(
+                    "timezone",
+                    DEFAULT_TIMEZONE,
+                )
+            )
+
+            print(
+                f"[{index:02d}/{len(cases):02d}]"
+                f" {case_id}: {question}"
+            )
+
+            plan = plan_query(
+                question=question,
+                timezone_name=timezone_name,
+                now=evaluation_now,
+                requested_language=(
+                    request_language
+                ),
+            )
+
+            local_summary = (
+                execute_local_plan(
+                    qdrant=qdrant,
+                    collection_name=(
+                        collection_name
+                    ),
+                    plan=plan,
+                )
+            )
+
+            payload = {
+                "message": question,
+                "actor": "evaluation-v2",
+                "timezone": timezone_name,
+                "language": request_language,
+                "requestId": (
+                    f"evaluation-v2-{case_id}"
+                ),
+            }
+
+            started = time.perf_counter()
+
+            try:
+                response = client.post(
+                    f"{args.agent_url.rstrip('/')}"
+                    "/api/log-agent/chat",
+                    json=payload,
+                )
+
+                latency_seconds = (
+                    time.perf_counter()
+                    - started
+                )
+
+                response.raise_for_status()
+                response_payload = (
+                    response.json()
+                )
+
+                result = check_case(
+                    case=case,
+                    response=response_payload,
+                    plan=plan,
+                    latency_seconds=(
+                        latency_seconds
+                    ),
+                    local_summary=(
+                        local_summary
+                    ),
+                    maximum_latency=(
+                        args.max_latency
+                    ),
+                )
+
+            except Exception as exc:
+                latency_seconds = (
+                    time.perf_counter()
+                    - started
+                )
+
+                result = {
+                    "id": case_id,
+                    "question": question,
+                    "requestLanguage": (
+                        request_language
+                    ),
+                    "expectedLanguage": (
+                        case.get(
+                            "expectedLanguage"
+                        )
+                    ),
+                    "detectedAnswerLanguage": None,
+                    "expectedIntent": case.get(
+                        "expectedIntent"
+                    ),
+                    "actualIntent": (
+                        plan.intent.value
+                    ),
+                    "expectedMode": case.get(
+                        "expectedMode"
+                    ),
+                    "actualMode": (
+                        plan.retrieval_mode.value
+                    ),
+                    "timeScope": (
+                        plan.time_scope.value
+                        if plan.time_scope
+                        else None
+                    ),
+                    "fromTimeUtc": utc_text(
+                        plan.from_time_utc
+                    ),
+                    "toTimeUtc": utc_text(
+                        plan.to_time_utc
+                    ),
+                    "expectedGrounded": (
+                        case.get(
+                            "expectedGrounded"
+                        )
+                    ),
+                    "actualGrounded": None,
+                    "evidenceCount": 0,
+                    "toolsUsed": [],
+                    "latencySeconds": round(
+                        latency_seconds,
+                        3,
+                    ),
+                    "latencyOk": False,
+                    "answer": "",
+                    "localOperationalSummary": (
+                        local_summary
+                    ),
+                    "equivalenceGroup": (
+                        case.get(
+                            "equivalenceGroup"
+                        )
+                    ),
+                    "failures": [
+                        f"requestError:"
+                        f" {type(exc).__name__}:"
+                        f" {exc}"
+                    ],
+                    "warnings": [],
+                    "passed": False,
+                }
+
+            results.append(result)
+
+            status = (
+                "PASS"
+                if result["passed"]
+                else "FAIL"
+            )
+
+            print(
+                f"    {status}"
+                f" | intent="
+                f"{result['actualIntent']}"
+                f" | mode="
+                f"{result['actualMode']}"
+                f" | grounded="
+                f"{result['actualGrounded']}"
+                f" | evidence="
+                f"{result['evidenceCount']}"
+                f" | latency="
+                f"{result['latencySeconds']}s"
+            )
+
+            if result["failures"]:
+                for failure in result[
+                    "failures"
+                ]:
+                    print(
+                        f"      - {failure}"
+                    )
+
+    equivalence_results = (
+        apply_equivalence_checks(results)
+    )
+
+    passed_count = sum(
+        1 for result in results
+        if result["passed"]
+    )
+
+    failed_count = (
+        len(results) - passed_count
+    )
+
+    latencies = [
+        float(result["latencySeconds"])
+        for result in results
+    ]
+
+    grounded_results = [
+        result
+        for result in results
+        if result.get(
+            "actualGrounded"
+        ) is not None
+    ]
+
+    grounded_count = sum(
+        1
+        for result in grounded_results
+        if result.get(
+            "actualGrounded"
+        )
+    )
+
+    timestamp = datetime.now(
+        timezone.utc
+    ).strftime("%Y%m%dT%H%M%SZ")
+
+    json_path = (
+        output_directory
+        / f"agent_v2_results_{timestamp}.json"
+    )
+
+    csv_path = (
+        output_directory
+        / f"agent_v2_results_{timestamp}.csv"
+    )
+
+    failures_path = (
+        output_directory
+        / f"agent_v2_failures_{timestamp}.jsonl"
+    )
+
+    summary_path = (
+        output_directory
+        / f"agent_v2_summary_{timestamp}.json"
+    )
+
+    json_path.write_text(
+        json.dumps(
+            results,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    write_csv(
+        csv_path,
+        results,
+    )
+
+    with failures_path.open(
+        "w",
+        encoding="utf-8",
+    ) as file:
+        for result in results:
+            if not result["passed"]:
+                file.write(
+                    json.dumps(
+                        result,
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+    summary = {
+        "generatedAtUtc": timestamp,
+        "agentUrl": args.agent_url,
+        "collection": collection_name,
+        "totalCases": len(results),
+        "passedCases": passed_count,
+        "failedCases": failed_count,
+        "passRate": round(
+            passed_count
+            / len(results)
+            * 100,
+            2,
+        ),
+        "groundedResponses": (
+            grounded_count
+        ),
+        "groundedRate": round(
+            grounded_count
+            / len(grounded_results)
+            * 100,
+            2,
+        ) if grounded_results else None,
+        "averageLatencySeconds": round(
+            statistics.mean(latencies),
+            3,
+        ),
+        "medianLatencySeconds": round(
+            statistics.median(latencies),
+            3,
+        ),
+        "maximumLatencySeconds": round(
+            max(latencies),
+            3,
+        ),
+        "equivalenceGroups": (
+            equivalence_results
+        ),
+        "resultFiles": {
+            "json": str(json_path),
+            "csv": str(csv_path),
+            "failures": str(
+                failures_path
+            ),
+        },
+    }
+
+    summary_path.write_text(
+        json.dumps(
+            summary,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    print()
+    print("=" * 78)
+    print("EVALUATION TAMAMLANDI")
+    print("=" * 78)
+    print(
+        f"Başarılı: {passed_count}"
+        f"/{len(results)}"
+    )
+    print(
+        f"Başarı oranı:"
+        f" {summary['passRate']}%"
+    )
+    print(
+        f"Ortalama cevap süresi:"
+        f" {summary['averageLatencySeconds']}"
+        f" saniye"
+    )
+    print(f"JSON: {json_path}")
+    print(f"CSV:  {csv_path}")
+    print(
+        f"Hatalar: {failures_path}"
+    )
+    print(f"Özet: {summary_path}")
+
+    raise SystemExit(
+        0 if failed_count == 0 else 1
+    )
+
+
+if __name__ == "__main__":
+    main()

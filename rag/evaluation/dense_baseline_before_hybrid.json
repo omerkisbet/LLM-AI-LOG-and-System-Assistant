@@ -1,0 +1,922 @@
+{
+  "retrievalMode": "dense-only",
+  "generatedAt": "2026-07-24T11:16:51.330331+00:00",
+  "agentUrl": "http://10.142.1.136:8000/api/log-agent/chat",
+  "testCount": 15,
+  "results": [
+    {
+      "id": "Q01",
+      "question": "Bugün sistemde hangi hatalar oluştu?",
+      "expected": {
+        "sourceType": "RUNTIME_LOG",
+        "level": "ERROR"
+      },
+      "httpStatus": 200,
+      "latencyMs": 68.63,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q02",
+      "question": "Sistemde oluşan önemli hataları özetle.",
+      "expected": {
+        "sourceType": "RUNTIME_LOG",
+        "level": "ERROR"
+      },
+      "httpStatus": 200,
+      "latencyMs": 67.08,
+      "grounded": true,
+      "evidenceCount": 12,
+      "matchingEvidenceCount": 12,
+      "filterPrecision": 1.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter",
+        "deterministic_fallback"
+      ],
+      "answer": "Filtrelerle eşleşen 27 kayıt bulundu. Rapor için en ilgili 12 kayıt incelendi. Kaynak türleri: RUNTIME_LOG.",
+      "evidence": [
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a621f42a5654ddf13d1fb8d",
+          "timestamp": "2026-07-23T14:03:46.279000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:03:46.279Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61d8ebca8bd5fdaf768e23",
+          "timestamp": "2026-07-23T09:03:39.403000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T09:03:39.403Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622078a5654ddf13d1fbc4",
+          "timestamp": "2026-07-23T14:08:56.907000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:08:56.907Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f9f7ae14db2b34923024",
+          "timestamp": "2026-07-23T11:24:39.022000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:24:39.022Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f6f7da31452f86d0cf33",
+          "timestamp": "2026-07-23T11:11:51.034000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:11:51.034Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620006ae14db2b34923048",
+          "timestamp": "2026-07-23T11:50:30.727000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:50:30.727Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8e3da31452f86d0cf51",
+          "timestamp": "2026-07-23T11:20:03.068000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:20:03.068Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622faaa5654ddf13d1fc14",
+          "timestamp": "2026-07-23T15:13:46.657000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T15:13:46.657Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a6211eda5654ddf13d1fb5b",
+          "timestamp": "2026-07-23T13:06:53.305000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T13:06:53.305Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620e43ae14db2b349230d4",
+          "timestamp": "2026-07-23T12:51:15.651000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T12:51:15.651Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a6211e3a5654ddf13d1fb56",
+          "timestamp": "2026-07-23T13:06:43.684000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T13:06:43.684Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620e28ae14db2b349230be",
+          "timestamp": "2026-07-23T12:50:48.111000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T12:50:48.111Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        }
+      ],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q03",
+      "question": "Bugün hangi içerikler silindi?",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "DELETE"
+      },
+      "httpStatus": 200,
+      "latencyMs": 28.73,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q04",
+      "question": "Bugün silinen haberler hangileri?",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "DELETE",
+        "entityType": "NEWS"
+      },
+      "httpStatus": 200,
+      "latencyMs": 34.23,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q05",
+      "question": "Silinen projeleri raporla.",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "DELETE",
+        "entityType": "PROJECT"
+      },
+      "httpStatus": 200,
+      "latencyMs": 30.89,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q06",
+      "question": "Bugün hangi projeler güncellendi?",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "UPDATE",
+        "entityType": "PROJECT"
+      },
+      "httpStatus": 200,
+      "latencyMs": 29.98,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q07",
+      "question": "Güncellenen yayınları listele.",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "UPDATE",
+        "entityType": "PUBLICATION"
+      },
+      "httpStatus": 200,
+      "latencyMs": 59.71,
+      "grounded": true,
+      "evidenceCount": 12,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter",
+        "deterministic_fallback"
+      ],
+      "answer": "Filtrelerle eşleşen 12 kayıt bulundu. Rapor için en ilgili 12 kayıt incelendi. Kaynak türleri: RUNTIME_LOG.",
+      "evidence": [
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622078a5654ddf13d1fbc4",
+          "timestamp": "2026-07-23T14:08:56.907000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:08:56.907Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61d8ebca8bd5fdaf768e23",
+          "timestamp": "2026-07-23T09:03:39.403000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T09:03:39.403Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a6200aeae14db2b34923066",
+          "timestamp": "2026-07-23T11:53:18.155000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:53:18.155Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622104a5654ddf13d1fbdc",
+          "timestamp": "2026-07-23T14:11:16.359000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:11:16.359Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620006ae14db2b34923048",
+          "timestamp": "2026-07-23T11:50:30.727000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:50:30.727Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622fb2a5654ddf13d1fc18",
+          "timestamp": "2026-07-23T15:13:54.358000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T15:13:54.358Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620e43ae14db2b349230d4",
+          "timestamp": "2026-07-23T12:51:15.651000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T12:51:15.651Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f9f7ae14db2b34923024",
+          "timestamp": "2026-07-23T11:24:39.022000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:24:39.022Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8e3da31452f86d0cf51",
+          "timestamp": "2026-07-23T11:20:03.068000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:20:03.068Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f6f7da31452f86d0cf33",
+          "timestamp": "2026-07-23T11:11:51.034000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:11:51.034Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622faaa5654ddf13d1fc14",
+          "timestamp": "2026-07-23T15:13:46.657000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T15:13:46.657Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61d772ca8bd5fdaf768e0e",
+          "timestamp": "2026-07-23T08:57:22.490000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T08:57:22.490Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        }
+      ],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q08",
+      "question": "Bugün eklenen öğrenciler var mı?",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "CREATE",
+        "entityType": "STUDENT"
+      },
+      "httpStatus": 200,
+      "latencyMs": 26.57,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q09",
+      "question": "Bugün silinen etkinlikleri göster.",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "DELETE",
+        "entityType": "ACTIVITY"
+      },
+      "httpStatus": 200,
+      "latencyMs": 24.31,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q10",
+      "question": "Son 3 saatte başarısız giriş oldu mu?",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "LOGIN_FAILURE"
+      },
+      "httpStatus": 200,
+      "latencyMs": 26.37,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q11",
+      "question": "Bugün engellenen giriş denemelerini raporla.",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "LOGIN_BLOCKED"
+      },
+      "httpStatus": 200,
+      "latencyMs": 26.69,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q12",
+      "question": "Bugün başarılı giriş yapan kullanıcılar var mı?",
+      "expected": {
+        "sourceType": "AUDIT_LOG",
+        "action": "LOGIN_SUCCESS"
+      },
+      "httpStatus": 200,
+      "latencyMs": 26.68,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": 0.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q13",
+      "question": "Son 24 saatte oluşan kritik hataları özetle.",
+      "expected": {
+        "sourceType": "RUNTIME_LOG",
+        "level": "ERROR"
+      },
+      "httpStatus": 200,
+      "latencyMs": 58.1,
+      "grounded": true,
+      "evidenceCount": 12,
+      "matchingEvidenceCount": 12,
+      "filterPrecision": 1.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter",
+        "deterministic_fallback"
+      ],
+      "answer": "Filtrelerle eşleşen 22 kayıt bulundu. Rapor için en ilgili 12 kayıt incelendi. Kaynak türleri: RUNTIME_LOG.",
+      "evidence": [
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8a9da31452f86d0cf4c",
+          "timestamp": "2026-07-23T11:19:05.009000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:19:05.009Z. Level: ERROR. Category: HTTP. Source: SPRING_BOOT. Logger: com.example.demo.logging.web.RequestCorrelationFilter. Message: HTTP POST /api/admin/log-assistant/chat -> 502 in 17 ms. HTTP method: POST. Path: /api/admin/log-assistant/chat. Status code: 502. Duration milliseconds: 17. Actor: admin. Request ID: bda19724-2adb-4f0d-a3da-ee4300be7979.",
+          "requestId": "bda19724-2adb-4f0d-a3da-ee4300be7979"
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8a8da31452f86d0cf48",
+          "timestamp": "2026-07-23T11:19:04.699000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:19:04.699Z. Level: ERROR. Category: HTTP. Source: SPRING_BOOT. Logger: com.example.demo.logging.web.RequestCorrelationFilter. Message: HTTP POST /api/admin/log-assistant/chat -> 502 in 14 ms. HTTP method: POST. Path: /api/admin/log-assistant/chat. Status code: 502. Duration milliseconds: 14. Actor: admin. Request ID: 3be45b55-d431-4711-a9db-e3be76f68142.",
+          "requestId": "3be45b55-d431-4711-a9db-e3be76f68142"
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8a7da31452f86d0cf46",
+          "timestamp": "2026-07-23T11:19:03.483000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:19:03.483Z. Level: ERROR. Category: HTTP. Source: SPRING_BOOT. Logger: com.example.demo.logging.web.RequestCorrelationFilter. Message: HTTP POST /api/admin/log-assistant/chat -> 502 in 17 ms. HTTP method: POST. Path: /api/admin/log-assistant/chat. Status code: 502. Duration milliseconds: 17. Actor: admin. Request ID: e4b9abbe-2f5c-4230-b1bd-1939db3a501d.",
+          "requestId": "e4b9abbe-2f5c-4230-b1bd-1939db3a501d"
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8eada31452f86d0cf5e",
+          "timestamp": "2026-07-23T11:20:10.027000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:20:10.027Z. Level: ERROR. Category: HTTP. Source: SPRING_BOOT. Logger: com.example.demo.logging.web.RequestCorrelationFilter. Message: HTTP POST /api/admin/log-assistant/chat -> 502 in 14 ms. HTTP method: POST. Path: /api/admin/log-assistant/chat. Status code: 502. Duration milliseconds: 14. Actor: admin. Request ID: a9728efa-22a1-4b8a-b1f9-422e56a6cd0f.",
+          "requestId": "a9728efa-22a1-4b8a-b1f9-422e56a6cd0f"
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8a8da31452f86d0cf4a",
+          "timestamp": "2026-07-23T11:19:04.852000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:19:04.852Z. Level: ERROR. Category: HTTP. Source: SPRING_BOOT. Logger: com.example.demo.logging.web.RequestCorrelationFilter. Message: HTTP POST /api/admin/log-assistant/chat -> 502 in 13 ms. HTTP method: POST. Path: /api/admin/log-assistant/chat. Status code: 502. Duration milliseconds: 13. Actor: admin. Request ID: fecdc93c-0e76-4d14-9f5e-97671d5d398b.",
+          "requestId": "fecdc93c-0e76-4d14-9f5e-97671d5d398b"
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8a9da31452f86d0cf4e",
+          "timestamp": "2026-07-23T11:19:05.168000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:19:05.168Z. Level: ERROR. Category: HTTP. Source: SPRING_BOOT. Logger: com.example.demo.logging.web.RequestCorrelationFilter. Message: HTTP POST /api/admin/log-assistant/chat -> 502 in 13 ms. HTTP method: POST. Path: /api/admin/log-assistant/chat. Status code: 502. Duration milliseconds: 13. Actor: admin. Request ID: 191082f6-e18d-4a86-aadd-725069e7cdc0.",
+          "requestId": "191082f6-e18d-4a86-aadd-725069e7cdc0"
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620006ae14db2b34923048",
+          "timestamp": "2026-07-23T11:50:30.727000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:50:30.727Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622078a5654ddf13d1fbc4",
+          "timestamp": "2026-07-23T14:08:56.907000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:08:56.907Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f9f7ae14db2b34923024",
+          "timestamp": "2026-07-23T11:24:39.022000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:24:39.022Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8e3da31452f86d0cf51",
+          "timestamp": "2026-07-23T11:20:03.068000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:20:03.068Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620e28ae14db2b349230be",
+          "timestamp": "2026-07-23T12:50:48.111000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T12:50:48.111Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620e43ae14db2b349230d4",
+          "timestamp": "2026-07-23T12:51:15.651000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T12:51:15.651Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        }
+      ],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q14",
+      "question": "Favicon ile ilgili hatalar nelerdir?",
+      "expected": {
+        "sourceType": "RUNTIME_LOG",
+        "level": "ERROR"
+      },
+      "httpStatus": 200,
+      "latencyMs": 56.0,
+      "grounded": true,
+      "evidenceCount": 12,
+      "matchingEvidenceCount": 12,
+      "filterPrecision": 1.0,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter",
+        "deterministic_fallback"
+      ],
+      "answer": "Filtrelerle eşleşen 27 kayıt bulundu. Rapor için en ilgili 12 kayıt incelendi. Kaynak türleri: RUNTIME_LOG.",
+      "evidence": [
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a621f42a5654ddf13d1fb8d",
+          "timestamp": "2026-07-23T14:03:46.279000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:03:46.279Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620e28ae14db2b349230be",
+          "timestamp": "2026-07-23T12:50:48.111000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T12:50:48.111Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a620006ae14db2b34923048",
+          "timestamp": "2026-07-23T11:50:30.727000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:50:30.727Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f9f7ae14db2b34923024",
+          "timestamp": "2026-07-23T11:24:39.022000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:24:39.022Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61d8ebca8bd5fdaf768e23",
+          "timestamp": "2026-07-23T09:03:39.403000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T09:03:39.403Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a6211eda5654ddf13d1fb5b",
+          "timestamp": "2026-07-23T13:06:53.305000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T13:06:53.305Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f8e3da31452f86d0cf51",
+          "timestamp": "2026-07-23T11:20:03.068000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:20:03.068Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622078a5654ddf13d1fbc4",
+          "timestamp": "2026-07-23T14:08:56.907000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:08:56.907Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a61f6f7da31452f86d0cf33",
+          "timestamp": "2026-07-23T11:11:51.034000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T11:11:51.034Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a621f3aa5654ddf13d1fb88",
+          "timestamp": "2026-07-23T14:03:38.208000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T14:03:38.208Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a6211e3a5654ddf13d1fb56",
+          "timestamp": "2026-07-23T13:06:43.684000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T13:06:43.684Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        },
+        {
+          "sourceType": "RUNTIME_LOG",
+          "recordId": "6a622faaa5654ddf13d1fc14",
+          "timestamp": "2026-07-23T15:13:46.657000Z",
+          "level": "ERROR",
+          "action": null,
+          "entityType": null,
+          "entityId": null,
+          "description": "Operational runtime log at 2026-07-23T15:13:46.657Z. Level: ERROR. Category: APPLICATION. Source: SPRING_BOOT. Logger: com.example.demo.exception.GlobalExceptionHandler. Message: Unexpected error occurred at /favicon.ico. Throwable: org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico for request '/favicon.ico'.\n\tat org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:527) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:50) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:892) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:622) ~[tomcat-embed-core-11.0.22.jar!/:na]\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874) ~[spring-webmvc-7.0.8.jar!/:7.0.8]\n\tat jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710) ~[tomcat-embed-core-11.0.22.jar!/:na]\n",
+          "requestId": null
+        }
+      ],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    },
+    {
+      "id": "Q15",
+      "question": "Bugün sistemde genel olarak neler oldu?",
+      "expected": {},
+      "httpStatus": 200,
+      "latencyMs": 26.36,
+      "grounded": false,
+      "evidenceCount": 0,
+      "matchingEvidenceCount": 0,
+      "filterPrecision": null,
+      "usedDenseRetrieval": true,
+      "usedQwen": false,
+      "toolsUsed": [
+        "qdrant_dense_retrieval",
+        "qdrant_payload_filter"
+      ],
+      "answer": "Soruyla eşleşen bir operasyon logu bulunamadı.",
+      "evidence": [],
+      "manualRelevanceScore": null,
+      "manualNotes": "",
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+# =========================
+# Java / Kotlin / Spring Boot
+# =========================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+.mvn/timing.properties
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin
+.kotlin/
+
+# =========================
+# IDEs / Editors
+# =========================
+
+# IntelliJ IDEA / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+application-local.properties
+application-local.yml
+application-local.yaml
+application-secret.properties
+application-secret.yml
+application-secret.yaml
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+log/
+
+# =========================
+# Runtime / Uploads / Local Data
+# =========================
+uploads/
+data/
+tmp/
+temp/
+*.pid
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Docker
+# =========================
+docker-data/
+docker-volumes/
+
+# =========================
+# OS generated files
+# =========================
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.Trash-*
+
+# =========================
+# Misc
+# =========================
+*.swp
+*.swo
+*.bak
+*.tmp
+# LLM model weights
+models/
+checkpoints/
+
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# HuggingFace cache
+.cache/
+huggingface/

@@ -1,0 +1,118 @@
+﻿id,question,requestLanguage,expectedLanguage,detectedAnswerLanguage,expectedIntent,actualIntent,expectedMode,actualMode,timeScope,fromTimeUtc,toTimeUtc,expectedGrounded,actualGrounded,evidenceCount,latencySeconds,latencyOk,toolsUsed,passed,failures,warnings,answer
+daily-summary-tr,Bugün neler oldu?,tr,tr,tr,DAILY_SUMMARY,DAILY_SUMMARY,AGGREGATE,AGGREGATE,TODAY,2026-07-23T21:00:00Z,2026-07-24T15:24:04.137001Z,,True,20,42.67,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;qwen_report_generation;sqlite_telemetry,True,,,"Bugün (2026-07-24) saat 21:00 ile 15:24 arasında (İstanbul saati) toplam 147 olay kaydı incelendi. Bu olaylar, 146 adet çalışma logu ve 1 adet güvenlik logu içeriyor.
+
+Ana olaylar:
+- Sistem, /api/internal/rag/log-events rotasına 23 kez, /api/admin/runtime-logs/summary rotasına 21 kez, /api/admin/log-assistant/chat rotasına 17 kez erişildi.
+- /api/publications, /api/news/active, /api/students ve /api/projects rotalarına sırasıyla 8, 6, 6 ve 6 kez erişildi.
+- Tüm istekler 200 durum kodu ile başarılı bir şekilde tamamlandı.
+- 2 adet hata (NoResourceFoundException) oluştu, bu durum sistemde kayıtlı bir kaynak bulunamadığı anlamına gelir.
+- 1 adet başarılı giriş (LOGIN_SUCCESS) kaydı tespit edildi.
+
+Tüm olaylar, sistem genelinde normal bir şekilde çalışmaktadır. Hata sayısı 2 olmasına rağmen, bu durum kritik seviyede değil. Sistem, belirtilen zaman diliminde tüm isteklerin başarılı şekilde işlendiğini göstermektedir.
+
+Kaynaklar: RUNTIME_LOG, AUDIT_LOG"
+daily-summary-en,What happened today?,en,en,en,DAILY_SUMMARY,DAILY_SUMMARY,AGGREGATE,AGGREGATE,TODAY,2026-07-23T21:00:00Z,2026-07-24T15:24:04.137001Z,,True,20,26.793,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;qwen_report_generation;sqlite_telemetry,True,,,"Today, from 21:00 UTC to 15:24 UTC (Europe/Istanbul time), the system recorded 147 events, primarily operational runtime logs. The majority of logs (140) were at the INFO level, indicating normal system operations. Key activities included successful HTTP requests to endpoints such as /api/internal/rag/log-events (23 requests), /api/publications (8), /api/news/active (6), /api/students (8), and /api/projects (6), all returning status code 200.
+
+There were 2 errors, both of type ""NoResourceFoundException,"" and 4 warnings. No creation, update, or deletion events were recorded. One audit log entry recorded a successful login. All logs originated from the SPRING_BOOT application, with no critical errors or system failures.
+
+Source types used: RUNTIME_LOG, AUDIT_LOG"
+yesterday-summary-tr,Dün neler oldu?,tr,tr,tr,DAILY_SUMMARY,DAILY_SUMMARY,AGGREGATE,AGGREGATE,YESTERDAY,2026-07-22T21:00:00Z,2026-07-23T20:59:59.999999Z,,True,20,59.192,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;qwen_report_generation;sqlite_telemetry,True,,,"Dün (2026-07-22, 21:00 - 20:59 UTC) saatlerinde sistem, 583 adet log kaydı üretti. Bu kayıtların %98’i (575 adet) runtime log, 8 adeti audit log kaydı olarak sınıflandırıldı.
+
+Ana operasyon durumu şu şekilde:
+
+- Sistem, 15:20’de başlatıldı. Başlangıçta ""Demo1Application"" uygulaması 18.269 saniyede başlatıldı ve 22.697 saniye boyunca çalışıyor.
+- Tomcat, 8080 portunda HTTP ile başlatıldı (context path: ""/"").
+- Spring Boot, /actuator ve /swagger-ui.html gibi endpoint’lerin etkin olduğunu bildirdi. Bu endpoint’ler üretim ortamında olmamalı; bu durumun engellenmesi için yapılandırma ayarları gereklidir.
+- Sistemde 27 hata, 52 uyarı ve 496 bilgilendirme mesajı oluştu.
+
+En çok görülen hatalar:
+- ""NoResourceFoundException"" (19 kez)
+- ""HTTP"" (7 kez)
+
+En çok erişilen yollar:
+- `/api/internal/rag/log-events` (94 kez)
+- `/api/admin/runtime-logs/summary` (43 kez)
+- `/api/admin/log-assistant/chat` (33 kez)
+
+Kullanıcı girişleri ile ilgili:
+- 7 başarılı giriş, 1 başarısız giriş kaydı bulundu.
+
+Not: Log kayıtları, 2026-07-23 tarihindeki 15:20’de başlayan bir başlangıç durumuyla sınırlı. Toplam 583 kayıt, sadece 6 adet örnek log ile temsil edildi. Bu nedenle, tüm operasyonların tamamı bu örneklerle açıklanamaz.
+
+Kaynaklar: RUNTIME_LOG, AUDIT_LOG"
+yesterday-summary-en,What happened yesterday?,en,en,en,DAILY_SUMMARY,DAILY_SUMMARY,AGGREGATE,AGGREGATE,YESTERDAY,2026-07-22T21:00:00Z,2026-07-23T20:59:59.999999Z,,True,20,34.001,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;qwen_report_generation;sqlite_telemetry,True,,,"Yesterday, from 21:00 UTC to 20:59 UTC (Europe/Istanbul timezone), the system recorded 583 events. The majority of logs (496) were informational (INFO), 52 were warnings (WARN), and 27 were errors (ERROR). 
+
+Key operational activities included:
+- The application started successfully at 15:20:21.633 UTC, with the Spring Boot application initialized and Tomcat running on port 8080.
+- The system exposed Actuator endpoints at `/actuator` and served a welcome page from `static/index.html`.
+- SpringDoc endpoints (`/swagger-ui.html` and `/v3/api-docs`) were enabled by default, which is a security concern in production environments.
+- There were 7 HTTP 502 errors and 19 instances of ""NoResourceFoundException"", with no login events (no successful or failed logins).
+
+No creation, update, or deletion events occurred. The top accessed paths were `/api/internal/rag/log-events` (94 times), followed by `/api/admin/runtime-logs/summary` (43 times).
+
+The evidence provided is a sample of the full log data; the full dataset contains 583 records. 
+
+Source types used: RUNTIME_LOG, AUDIT_LOG"
+error-count-tr,Son 2 saatte kaç hata oluştu?,tr,tr,tr,ERROR_COUNT,ERROR_COUNT,AGGREGATE,AGGREGATE,RELATIVE,2026-07-24T13:24:04.137001Z,2026-07-24T15:24:04.137001Z,,False,0,0.011,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;sqlite_telemetry,True,,,Soruyla eşleşen bir operasyon logu bulunamadı.
+error-count-en,How many errors occurred in the last two hours?,en,en,unknown,ERROR_COUNT,ERROR_COUNT,AGGREGATE,AGGREGATE,RELATIVE,2026-07-24T13:24:04.137001Z,2026-07-24T15:24:04.137001Z,,False,0,0.007,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;sqlite_telemetry,True,,Cevap dili kesin belirlenemedi.,No operational log matched the question.
+deleted-yesterday-tr,Dün hangi kayıtlar silindi?,tr,tr,tr,AUDIT_DELETE_LIST,AUDIT_DELETE_LIST,FILTERED_LIST,FILTERED_LIST,YESTERDAY,2026-07-22T21:00:00Z,2026-07-23T20:59:59.999999Z,,False,0,0.008,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;sqlite_telemetry,True,,,Soruyla eşleşen bir operasyon logu bulunamadı.
+deleted-yesterday-en,Which records were deleted yesterday?,en,en,unknown,AUDIT_DELETE_LIST,AUDIT_DELETE_LIST,FILTERED_LIST,FILTERED_LIST,YESTERDAY,2026-07-22T21:00:00Z,2026-07-23T20:59:59.999999Z,,False,0,0.007,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;sqlite_telemetry,True,,Cevap dili kesin belirlenemedi.,No operational log matched the question.
+updated-news-tr,Bugün hangi haberler güncellendi?,tr,tr,tr,AUDIT_UPDATE_LIST,AUDIT_UPDATE_LIST,FILTERED_LIST,FILTERED_LIST,TODAY,2026-07-23T21:00:00Z,2026-07-24T15:24:04.137001Z,,False,0,0.008,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;sqlite_telemetry,True,,,Soruyla eşleşen bir operasyon logu bulunamadı.
+updated-news-en,Which news items were updated today?,en,en,unknown,AUDIT_UPDATE_LIST,AUDIT_UPDATE_LIST,FILTERED_LIST,FILTERED_LIST,TODAY,2026-07-23T21:00:00Z,2026-07-24T15:24:04.137001Z,,False,0,0.008,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;sqlite_telemetry,True,,Cevap dili kesin belirlenemedi.,No operational log matched the question.
+clock-window-tr,Saat 14.30 civarında ne oldu?,tr,tr,tr,TIME_WINDOW_SEARCH,TIME_WINDOW_SEARCH,FILTERED_LIST,FILTERED_LIST,CLOCK,2026-07-24T11:00:00Z,2026-07-24T12:00:00Z,,True,20,30.887,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;qwen_report_generation;sqlite_telemetry,True,,,"Saat 14.30 civarında verilen log kayıtlarında, 11:44 ve 11:47 saatlerinde HTTP isteklerinin başarılı şekilde işlendiği görülmektedir. Bu istekler, /api/publications, /api/news/active, /api/students ve /api/projects gibi endpoint'ler üzerinden yapılmıştır ve tüm istekler 200 durum kodu ile başarılı bir şekilde sonuçlanmıştır. 
+
+Saat 14.30 civarında doğrudan bir olay ya da hata kaydı bulunmamaktadır. Sistem, bu zaman diliminde normal operasyon modunda çalışmaktadır. 
+
+Kanal: RUNTIME_LOG  
+Kaynak türü: RUNTIME_LOG  
+Zaman dilimi: 2026-07-24T11:00:00Z - 2026-07-24T12:00:00Z"
+clock-window-en,What happened around 14:30?,en,en,en,TIME_WINDOW_SEARCH,TIME_WINDOW_SEARCH,FILTERED_LIST,FILTERED_LIST,CLOCK,2026-07-24T11:00:00Z,2026-07-24T12:00:00Z,,True,20,18.607,True,bilingual_query_planner;qdrant_payload_filter;qdrant_scroll_retrieval;deterministic_operational_summary;qwen_report_generation;sqlite_telemetry,True,,,"Around 14:30 in the Europe/Istanbul timezone, no events occurred within the specified time window (11:00–12:00 UTC). The provided evidence shows operational activity at 11:44 and 11:47 UTC, which is earlier than 14:30. All logs are from the runtime logs and do not include any records from the requested time. The query period does not align with any recorded events.
+
+Source types used: RUNTIME_LOG, AUDIT_LOG"
+exception-tr,NoResourceFoundException ve /favicon.ico hatasını açıkla.,tr,tr,tr,EXACT_IDENTIFIER_SEARCH,EXACT_IDENTIFIER_SEARCH,HYBRID,HYBRID,,,,True,True,12,55.649,True,bilingual_query_planner;qdrant_dense_retrieval;qdrant_sparse_bm25_retrieval;qdrant_rrf_hybrid_fusion;qdrant_payload_filter;exact_term_grounding_gate;qwen_report_generation;sqlite_telemetry,True,,,"**NoResourceFoundException ve /favicon.ico hatası açıklaması:**
+
+""**NoResourceFoundException**"" hata, bir web uygulamasında istenen bir statik kaynak (örneğin bir favicon dosyası) bulunamadığında oluşur. Bu durum, özellikle Spring Boot uygulamalarında, `/favicon.ico` gibi bir istek yapıldığında ortaya çıkar.
+
+İstek yapılan `/favicon.ico` dosyası uygulamanın statik kaynak klasöründe veya yapılandırılmış bir kaynak dizininde bulunmamaktadır. Bu nedenle, Spring Web MVC, `NoResourceFoundException` hatasıyla birlikte bir hata mesajı döndürür. Bu hata, kullanıcıya görünmeyen bir 404 hatası olarak yansıtır, ancak genellikle kullanıcı deneyimine zarar vermez çünkü favicon, genellikle bir web sayfasının görünümünü iyileştirmek için kullanılan küçük bir ikon olup, kullanıcıların doğrudan etkileşimi olmayan bir bileşendir.
+
+**Kanıt bilgisi:**  
+6 adet runtime log kaydı, 2026-07-23 tarihinde (İstanbul saati: 09:03:39 – 15:13:46 arası) `/favicon.ico` isteği yapıldığında `NoResourceFoundException` hatasının oluştuğunu göstermektedir. Tüm kayıtlar, aynı hata mesajını ve aynı stack trace’yi içerir. Bu, hata kaynağının uygulama tarafında (Spring Boot) ve `/favicon.ico` dosyasının eksik olduğunu doğrular.
+
+**Sonuç:**  
+Bu hata, uygulamanın statik kaynak yapılandırmasında bir eksiklikten kaynaklanır. `/favicon.ico` dosyasının uygulama klasöründe olup olmadığı kontrol edilmelidir. Eğer dosya yoksa, uygulama yapılandırmasında bu isteği engellemek veya varsayılan bir favicon belirlemek gerekir.
+
+**Kullanılan kaynak türleri:** RUNTIME_LOG"
+exception-en,Explain the NoResourceFoundException related to /favicon.ico.,en,en,en,EXACT_IDENTIFIER_SEARCH,EXACT_IDENTIFIER_SEARCH,HYBRID,HYBRID,,,,True,True,12,26.592,True,bilingual_query_planner;qdrant_dense_retrieval;qdrant_sparse_bm25_retrieval;qdrant_rrf_hybrid_fusion;qdrant_payload_filter;exact_term_grounding_gate;qwen_report_generation;sqlite_telemetry,True,,,"The NoResourceFoundException related to /favicon.ico occurs when a web application, specifically a Spring Boot application, receives a request for the /favicon.ico resource but fails to locate a static resource file at that path. This exception is logged in the runtime logs under the Spring Boot application's GlobalExceptionHandler, indicating that the requested favicon.ico file is not present in the configured static resources directory.
+
+All six evidence records show this error occurring at different timestamps between 11:20:03Z and 14:08:56Z (UTC), with the same exception message and stack trace. The error is consistent and repeated, suggesting that the application is configured to serve static resources via Spring Web MVC, but no favicon.ico file exists in the expected location.
+
+This is a common occurrence in web applications, as /favicon.ico is often requested by browsers for icon display, but it is not always required or provided. The error does not indicate a system failure or misconfiguration beyond the absence of the favicon file.
+
+Source types used: RUNTIME_LOG"
+semantic-error-tr,Sistemdeki en önemli uygulama hatalarını açıkla.,tr,tr,tr,SEMANTIC_SEARCH,SEMANTIC_SEARCH,HYBRID,HYBRID,,,,,True,12,49.249,True,bilingual_query_planner;qdrant_dense_retrieval;qdrant_sparse_bm25_retrieval;qdrant_rrf_hybrid_fusion;qdrant_payload_filter;qwen_report_generation;sqlite_telemetry,True,,,"Sistemdeki en önemli uygulama hataları, tüm log kayıtlarında ortak bir hata ile belirtilmektedir. Bu hata, `/favicon.ico` isteği için bulunan bir statik kaynak bulunamadığından kaynaklanmaktadır.
+
+Hata detayı:
+- **Hata Türü**: `NoResourceFoundException`
+- **Kaynak**: Spring Boot uygulaması
+- **Logger**: `com.example.demo.exception.GlobalExceptionHandler`
+- **İstek**: `/favicon.ico`
+- **Sistem Katmanı**: Uygulama katmanı (APPLICATION)
+
+Bu hata, sistemdeki tüm log kayıtlarında (toplam 6 kayıt) aynı anda tekrarlanmaktadır. Hata, özellikle 2026-07-23 ve 2026-07-24 tarihlerindeki saatlerde (09:03, 11:11, 11:24, 11:50, 14:03, 10:51) oluşmuş olup, sistemdeki bir statik kaynak (favicon.ico) eksikliği nedeniyle oluşmaktadır.
+
+Bu hata, kullanıcı deneyimini etkilemeyecektir çünkü `/favicon.ico` isteği genellikle görünümü etkilemez. Ancak, bu tür hatalar, sistemdeki yapısal eksiklikleri gösterir ve bir sonraki sürümde statik kaynakların eksik olup olmadığını kontrol etmek için dikkat çekicidir.
+
+**Not**: Bu hata, tüm log kayıtlarında aynı şekilde tekrarlanmaktadır. Bu nedenle, bu hata sistemdeki en önemli uygulama hatası olarak değerlendirilebilir. Ancak, bu hata kullanıcı etkisi yoktur ve sadece sistem yapısal bir eksiklik olarak değerlendirilir.
+
+**Kullanılan Kaynak Türleri**: RUNTIME_LOG"
+semantic-error-en,Explain the most important application errors in the system.,en,en,en,SEMANTIC_SEARCH,SEMANTIC_SEARCH,HYBRID,HYBRID,,,,,True,12,28.954,True,bilingual_query_planner;qdrant_dense_retrieval;qdrant_sparse_bm25_retrieval;qdrant_rrf_hybrid_fusion;qdrant_payload_filter;qwen_report_generation;sqlite_telemetry,True,,,"The most important application errors in the system, based on the provided evidence, are:
+
+1. **Missing Static Resource (favicon.ico)**: This error occurs repeatedly across multiple records and is logged under the `APPLICATION` category. It indicates that the system attempts to serve a static resource (`favicon.ico`) that does not exist. The root cause is a `NoResourceFoundException` from Spring Boot's resource handling mechanism. This is a non-critical error as it does not affect core functionality but may impact user experience or browser behavior.
+
+2. **502 Bad Gateway Errors**: These occur in HTTP requests to `/api/admin/log-assistant/chat`, with a status code of 502 and a short duration (14–17 ms). The error is logged under the `HTTP` category and suggests a backend service failure or misconfiguration in the API endpoint. This is a more critical error as it indicates a failure in processing incoming requests, potentially affecting administrative functionality.
+
+Note: The evidence sample includes only 6 records, and the error patterns are limited to these specific cases. The frequency and impact of these errors are not fully representative of the entire system due to the limited scope of the provided logs.
+
+Sources: RUNTIME_LOG"
+unknown-event-tr,QuantumPenguinXYZ hatası bugün oluştu mu?,tr,tr,tr,EXACT_IDENTIFIER_SEARCH,EXACT_IDENTIFIER_SEARCH,HYBRID,HYBRID,TODAY,2026-07-23T21:00:00Z,2026-07-24T15:24:04.137001Z,False,False,0,0.034,True,bilingual_query_planner;qdrant_dense_retrieval;qdrant_sparse_bm25_retrieval;qdrant_rrf_hybrid_fusion;qdrant_payload_filter;exact_term_grounding_gate;sqlite_telemetry,True,,,Kesin terimlerle doğrudan eşleşen bir operasyon logu bulunamadı: QuantumPenguinXYZ.
+unknown-event-en,Did the QuantumPenguinXYZ error occur today?,en,en,en,EXACT_IDENTIFIER_SEARCH,EXACT_IDENTIFIER_SEARCH,HYBRID,HYBRID,TODAY,2026-07-23T21:00:00Z,2026-07-24T15:24:04.137001Z,False,False,0,0.018,True,bilingual_query_planner;qdrant_dense_retrieval;qdrant_sparse_bm25_retrieval;qdrant_rrf_hybrid_fusion;qdrant_payload_filter;exact_term_grounding_gate;sqlite_telemetry,True,,,No operational log directly matching the exact term(s) QuantumPenguinXYZ was found.

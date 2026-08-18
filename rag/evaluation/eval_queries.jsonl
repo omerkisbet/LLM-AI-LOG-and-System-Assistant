@@ -1,0 +1,15 @@
+{"id":"Q01","question":"Bugün sistemde hangi hatalar oluştu?","expected":{"sourceType":"RUNTIME_LOG","level":"ERROR"}}
+{"id":"Q02","question":"Sistemde oluşan önemli hataları özetle.","expected":{"sourceType":"RUNTIME_LOG","level":"ERROR"}}
+{"id":"Q03","question":"Bugün hangi içerikler silindi?","expected":{"sourceType":"AUDIT_LOG","action":"DELETE"}}
+{"id":"Q04","question":"Bugün silinen haberler hangileri?","expected":{"sourceType":"AUDIT_LOG","action":"DELETE","entityType":"NEWS"}}
+{"id":"Q05","question":"Silinen projeleri raporla.","expected":{"sourceType":"AUDIT_LOG","action":"DELETE","entityType":"PROJECT"}}
+{"id":"Q06","question":"Bugün hangi projeler güncellendi?","expected":{"sourceType":"AUDIT_LOG","action":"UPDATE","entityType":"PROJECT"}}
+{"id":"Q07","question":"Güncellenen yayınları listele.","expected":{"sourceType":"AUDIT_LOG","action":"UPDATE","entityType":"PUBLICATION"}}
+{"id":"Q08","question":"Bugün eklenen öğrenciler var mı?","expected":{"sourceType":"AUDIT_LOG","action":"CREATE","entityType":"STUDENT"}}
+{"id":"Q09","question":"Bugün silinen etkinlikleri göster.","expected":{"sourceType":"AUDIT_LOG","action":"DELETE","entityType":"ACTIVITY"}}
+{"id":"Q10","question":"Son 3 saatte başarısız giriş oldu mu?","expected":{"sourceType":"AUDIT_LOG","action":"LOGIN_FAILURE"}}
+{"id":"Q11","question":"Bugün engellenen giriş denemelerini raporla.","expected":{"sourceType":"AUDIT_LOG","action":"LOGIN_BLOCKED"}}
+{"id":"Q12","question":"Bugün başarılı giriş yapan kullanıcılar var mı?","expected":{"sourceType":"AUDIT_LOG","action":"LOGIN_SUCCESS"}}
+{"id":"Q13","question":"Son 24 saatte oluşan kritik hataları özetle.","expected":{"sourceType":"RUNTIME_LOG","level":"ERROR"}}
+{"id":"Q14","question":"Favicon ile ilgili hatalar nelerdir?","expected":{"sourceType":"RUNTIME_LOG","level":"ERROR"}}
+{"id":"Q15","question":"Bugün sistemde genel olarak neler oldu?","expected":{}}
